@@ -576,17 +576,7 @@ Instead, we should have caught it by reference catch (GeneralException& e), then
 </p>
 </details>
 
-### 16. :skull:
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
+#### 16. :skull:
 ```
 #include <iostream>
 
@@ -599,15 +589,25 @@ int main () {
 <details><summary><b>Answer</b></summary>
 <p>
 
-####  The program is guaranteed to output: 0
+#### The program is guaranteed to output: 0
 Since a has static storage duration and no initializer, it is guaranteed to be zero-initialized. Had a been defined as a local non-static variable inside main(), this would not have happened.
 
 Note: int a has static storage duration because it is declared at namespace scope. It does not need to have static in front of it, that would only denote internal linkage.
+</p>
+</details>
+
+#### 17. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+####  
 
 </p>
 </details>
 
-#### :skull:
+#### 18. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
