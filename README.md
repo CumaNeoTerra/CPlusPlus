@@ -1,9 +1,11 @@
 # CPlusPlus
 Based on the site http://cppquiz.org/quiz, extraced questions for easier overview.
 
+The more :skull: you see, the higher the difficulty!
+
 According to the C++17 standard, what is the output of the following programs? 
  
-#### 1. According to the C++17 standard, what is the output of this program?   
+#### 1. :skull:   
 ```
 #include <iostream>
 
@@ -28,7 +30,7 @@ The right operand here being b, with the value 20. This is then the resulting va
 </p>
 </details>
 
-#### 2. According to the C++17 standard, what is the output of this program? 
+#### 2. :skull: 
 
 ```
 #include <iostream>
@@ -73,7 +75,7 @@ Destruction order is defined in [class.dtor](https://timsong-cpp.github.io/cppwp
 </p>
 </details>
 
-#### 3. According to the C++17 standard, what is the output of this program? 
+#### 3. :skull:
 ```
 #include <iostream>
 struct X {
@@ -103,7 +105,7 @@ arr is an array of X, not of pointers to X. When an object of type Y is stored i
 </p>
 </details>
 
-#### 4.  :skull: :skull: :skull:   
+#### 4. :skull::skull:   
 ```
 #include <iostream>
 
