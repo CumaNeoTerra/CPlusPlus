@@ -596,18 +596,78 @@ Note: int a has static storage duration because it is declared at namespace scop
 </p>
 </details>
 
-#### 17. :skull:
+#### 17. :skull::skull:
 ```
+#include <iostream>
+using namespace std;
+
+class C {
+public:
+  explicit C(int) {
+    std::cout << "i";
+  };
+  C(double) {
+    std::cout << "d";
+  };
+};
+
+int main() {
+  C c1(7);
+  C c2 = 7;
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-####  
+####  The program is guaranteed to output: id
+These are two examples of initialization. The first form, C c1(7), is called direct-initialization, the second, C c2 = 7, is called copy-initialization. In most cases they are equivalent, but in this example they are not, since the int constructor is explicit.
+
+The key is in [over.match.copy](https://timsong-cpp.github.io/cppwp/n4659/over.match.copy#1)§16.3.1.4¶1 :
+"[...] as part of a copy-initialization of an object of class type, a user-defined conversion can be invoked to convert an initializer expression to the type of the object being initialized. [...] the candidate functions are selected as follows:
+- [...]
+- When the type of the initializer expression is a class type "cv S", the non-explicit conversion functions of S and its base classes are considered. [...]
+(emphasis added)
+
+And how is direct-initialization defined?
+
+[dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#16)§11.6¶16: "The initialization that occurs in the forms
+T x(a);
+T x{a};
+(...) is called direct-initialization."
+
+So the int constructor is not even considered for initialization in the second case. Instead, a standard conversion sequence is used to convert the integer literal to a double, and the double constructor (the only candidate) is used.
 
 </p>
 </details>
 
 #### 18. :skull:
+```
+#include <iostream>
+
+class A {
+public:
+  A() { std::cout << 'a'; }
+  ~A() { std::cout << 'A'; }
+};
+
+class B {
+public:
+  B() { std::cout << 'b'; }
+  ~B() { std::cout << 'B'; }
+  A a;
+};
+
+int main() { B b; }
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+####  The program is guaranteed to output: abBA
+Member variables are initialized before the constructor is called. The destructor is called before member variables are destroyed.
+</p>
+</details>
+
+#### 19. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
