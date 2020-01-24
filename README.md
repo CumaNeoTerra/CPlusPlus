@@ -1,8 +1,9 @@
 # CPlusPlus
 Based on the site http://cppquiz.org/quiz, extraced questions for easier overview.
 
+According to the C++17 standard, what is the output of the following programs? 
  
-### 1. According to the C++17 standard, what is the output of this program?   
+#### 1. According to the C++17 standard, what is the output of this program?   
 ```
 #include <iostream>
 
@@ -27,7 +28,7 @@ The right operand here being b, with the value 20. This is then the resulting va
 </p>
 </details>
 
-### 2. According to the C++17 standard, what is the output of this program? 
+#### 2. According to the C++17 standard, what is the output of this program? 
 
 ```
 #include <iostream>
@@ -72,7 +73,7 @@ Destruction order is defined in [class.dtor](https://timsong-cpp.github.io/cppwp
 </p>
 </details>
 
-### 3. According to the C++17 standard, what is the output of this program? 
+#### 3. According to the C++17 standard, what is the output of this program? 
 ```
 #include <iostream>
 struct X {
@@ -102,7 +103,7 @@ arr is an array of X, not of pointers to X. When an object of type Y is stored i
 </p>
 </details>
 
-### 4.  According to the C++17 standard, what is the output of this program? 
+#### 4.  :skull: :skull: :skull:   
 ```
 #include <iostream>
 
@@ -169,16 +170,38 @@ Finally we get to f<>(0). <> is an (empty) template argument list, which can be 
 T is deduced to int, the specialization for int is the only candidate, and 2 is printed.
 </p>
 </details>
-:skull:  
+
+#### 5. :skull::skull::skull: 
 
 ```
+#include <iostream>
 
+int a = 1;
+
+int main() {
+    auto f = [](int b) { return a + b; };
+
+    std::cout << f(4);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 5  
 
+It is clear that a is not captured explicitly, so the question is whether a should be captured implicitly (and if yes, then a default capture has to be specified). [expr.prim.lambda.capture](https://timsong-cpp.github.io/cppwp/n4659/expr.prim.lambda.capture#7)§8.1.5.2¶7 says:
+
+    A lambda-expression with an associated capture-default that does not explicitly capture *this or a variable with automatic storage duration [...], is said to implicitly capture the entity (i.e., *this or a variable) if the compound-statement:
+    - odr-uses the entity (in the case of a variable),
+    - [...]
+
+The use of a constitutes an odr-use. But since a has static storage duration rather than automatic storage duration, it is not implicitly captured.
+
+Since a is neither explicitly nor implicitly captured, a in the lambda expression simply refers to the global variable a.
+
+(Note: It is also disallowed to capture a explicitly, because of [expr.prim.lambda.capture](https://timsong-cpp.github.io/cppwp/n4659/expr.prim.lambda.capture#4)§8.1.5.2¶4):
+
+    The identifier in a simple-capture is looked up using the usual rules for unqualified name lookup; each such lookup shall find an entity. An entity that is designated by a simple-capture is said to be explicitly captured, and shall be *this (when the simple-capture is “this” or “* this”) or a variable with automatic storage duration declared in the reaching scope of the local lambda expression.
 </p>
 </details>
 
