@@ -207,7 +207,376 @@ Since a is neither explicitly nor implicitly captured, a in the lambda expressio
 </p>
 </details>
 
-6. 
+#### 6. :skull::skull: 
+
+```   
+#include <iostream>
+
+int main() {
+    int i = '3' - '2';
+    std::cout << i;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+'3' and '2' are both ordinary character literals, with type char. But we don't know which values they have! That's up to the implementation:
+
+[lex.ccon](https://timsong-cpp.github.io/cppwp/n4659/lex.ccon#2)§5.13.3¶2:
+
+    An ordinary character literal that contains a single c-char representable in the execution character set has type char, with value equal to the numerical value of the encoding of the c-char in the execution character set.
+
+operator- subtracts the value of the second operand from the value of the first operand. But how can we know what the result is, when we don't know the values of the operands?
+
+[lex.charset](https://timsong-cpp.github.io/cppwp/n4659/lex.charset#3)§5.3¶3:
+
+    In both the source and execution basic character sets, the value of each character after 0 in the above list of decimal digits shall be one greater than the value of the previous.
+
+(The "above list of decimal digits" is simply 0123456789.)
+
+So we know that the difference between '3' and '2' is 1, even if we don't know their actual values. Importantly, this is only true for decimal digits, and not for instance for regular letters. There is no guarantee that 'b' - 'a' is 1.
+</p>
+</details>
+
+#### 7. :skull::skull:
+
+```
+#include <iostream>
+
+struct A {
+  A() { foo(); }
+  virtual ~A() { foo(); }
+  virtual void foo() { std::cout << "1"; }
+  void bar() { foo(); }
+};
+
+struct B : public A {
+  virtual void foo() { std::cout << "2"; }
+};
+
+int main() {
+  B b;
+  b.bar();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 121
+
+Even though foo() is virtual, it is not considered to be so during the execution of constructors and destructors.
+
+Rationale:
+
+If an object of type B is being constructed, first the constructor of A is called, then the constructor of B. Thus, during A's constructor, the "B part" of the object has not been constructed yet, and should not be used. One could easily imagine that B::foo() would use the "B part" of the object, so it would be dangerous for A's constructor to call it.
+
+When the object is destroyed, B's destructor is called first, then A's destructor, leading to the same problem.
+</p>
+</details>
+
+#### 8. :skull:
+
+```
+#include <iostream>
+using namespace std;
+
+int foo() {
+  cout << 1;
+  return 1;
+}
+
+void bar(int i = foo()) {}
+
+int main() {
+  bar();
+  bar();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+####  The program is guaranteed to output: 11
+
+Is foo called both times or just once? The C++ standard says this in [dcl.fct.default](https://timsong-cpp.github.io/cppwp/n4659/dcl.fct.default#9)§11.3.6¶9: "A default argument is evaluated each time the function is called with no argument for the corresponding parameter."
+
+Thus, foo is called twice.
+
+</p>
+</details>
+
+#### 9. :skull::skull:
+```
+#include <iostream>
+
+int main() {
+  int a = 0;
+  decltype((a)) b = a;
+  b++;
+  std::cout << a << b;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 11
+
+According to [dcl.type.simple](https://timsong-cpp.github.io/cppwp/n4659/dcl.type.simple#4)§10.1.7.2¶4 in the C++ standard:
+"The type denoted by decltype(e) is deﬁned as follows:
+- if e is an unparenthesized id-expression naming a structured binding ([dcl.struct.bind](https://timsong-cpp.github.io/cppwp/n4659/dcl.struct.bind)§11.5), decltype(e) is the referenced type as given in the specification of the structured binding declaration;
+— if e is an unparenthesized id-expression or an unparenthesized class member access ([expr.ref](https://timsong-cpp.github.io/cppwp/n4659/expr.ref)§8.2.5), decltype(e) is the type of the entity named by e. If there is no such entity, or if e names a set of overloaded functions, the program is ill-formed;
+— otherwise, if e is an xvalue, decltype(e) is T&&, where T is the type of e;
+— otherwise, if e is an lvalue, decltype(e) is T&, where T is the type of e;
+— otherwise, decltype(e) is the type of e."
+
+Because a is encapsulated in parentheses, it doesn't qualify for the first case, it is treated as an lvalue, therefore b's type is int&, not int.
+
+</p>
+</details>
+
+#### 10. :skull:
+
+```
+#include <iostream>
+     
+int main() {
+    char* str = "X";
+    std::cout << str;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+
+According to [lex.string](https://timsong-cpp.github.io/cppwp/n4659/lex.string#8)§5.13.5¶8 in the standard: "A narrow string literal has type “array of n const char”"
+
+An array of n const char converts to a pointer to const char. A note in [conv.qual](https://timsong-cpp.github.io/cppwp/n4659/conv.qual#4)§7.5¶4 extrapolates from the preceeding normative passages that "a prvalue of type “pointer to cv1 T” can be converted to a prvalue of type “pointer to cv2 T” if “cv2 T” is more cv-qualified than “cv1 T”." In this case however, char* is less cv-qualified than const char *, and the conversion is not allowed.
+
+Note: While most compilers still allow char const[] to char* conversion with just a warning, this is not a legal conversion since C++11.
+
+See also http://dev.krzaq.cc/stop-assigning-string-literals-to-char-star-already/
+</p>
+</details>
+
+#### 11. :skull::skull::skull:
+
+```
+#include <iostream>
+
+struct X {
+  X() { std::cout << "X"; }
+};
+
+struct Y {
+  Y(const X &x) { std::cout << "Y"; }
+  void f() { std::cout << "f"; }
+};
+
+int main() {
+  Y y(X());
+  y.f();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+
+The compilation error is on the line y.f(), but the source of the problem is Y y(X());
+
+This could be interpreted as a a variable definition (which was the intention of the programmer in this example), or as a definition of a function y, returning an object of type Y, taking a function (with no arguments, returning an object of type X) as its argument.
+
+The compiler is required by the standard to choose the second interpretation, which means that y.f() does not compile (since y is now a function, not an object of type Y).
+
+Wikipedia has a concise explanation: http://en.wikipedia.org/wiki/Most_vexing_parse, and the standard has more in [stmt.ambig](https://timsong-cpp.github.io/cppwp/n4659/stmt.ambig)§6.8.
+
+To fix the problem, change Y y(X()) to either Y y{X{}} (modern C++) or Y y((X())) (pre-C++11)
+</p>
+</details>
+
+#### 12. :skull::skull:
+
+```
+#include <iostream>
+#include <utility>
+
+int y(int &) { return 1; }
+int y(int &&) { return 2; }
+
+template <class T> int f(T &&x) { return y(x); }
+template <class T> int g(T &&x) { return y(std::move(x)); }
+template <class T> int h(T &&x) { return y(std::forward<T>(x)); }
+
+int main() {
+  int i = 10;
+  std::cout << f(i) << f(20);
+  std::cout << g(i) << g(20);
+  std::cout << h(i) << h(20);
+  return 0;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 112212
+
+The T&& in the templated functions do not necessarily denote an rvalue reference, it depends on the type that is used to instantiate the template. If instantiated with an lvalue, it collapses to an lvalue reference, if instantiated with an rvalue, it collapses to an rvalue reference. See note [1].
+
+Scott Meyers has written a very good article about this, where he introduces the concept of "universal references" (the official term is "forwarding reference") http://isocpp.org/blog/2012/11/universal-references-in-c11-scott-meyers
+
+In this example, all three functions are called once with an lvalue and once with an rvalue. In all cases, calling with an lvalue (i) collapses T&& x to T& x (an lvalue reference), and calling with an rvalue (20) collapses T&& x to T&& x (an rvalue reference). Inside the functions, x itself is always an lvalue, no matter if its type is an rvalue reference or an lvalue reference.
+
+-For the first example, y(int&) is called for both cases. Output: 11.
+-For the second example, move(x) obtains an rvalue reference, and y(int&&)is called for both cases. Output: 22.
+-For the third example, forward<T>(x) obtains an lvalue reference when x is an lvalue reference, and an rvalue reference when x is an rvalue reference, resulting in first a call to y(int&)and then a call to y(int&&). Output: 12.
+
+Note [1]: [dcl.ref](https://timsong-cpp.github.io/cppwp/n4659/dcl.ref#6)§11.3.2¶6 in the standard: "If a typedef-name (§10.1.3, §17.1) or a decltype-specifier (§10.1.7.2) denotes a type TR that is a reference to a type T, an attempt to create the type “lvalue reference to cv TR” creates the type “lvalue reference to T”, while an attempt to create the type “rvalue reference to cv TR” creates the type TR." The example at the end of that paragraph is worth a look.
+
+Note from the contributor: This demonstrates Scott Meyers's advice to use std::forward for forwarding references, and std::move for rvalue references.
+
+</p>
+</details>
+
+#### 13. :skull::skull:
+
+```
+#include <iostream>
+
+struct E
+{
+  E() { std::cout << "1"; }
+  E(const E&) { std::cout << "2"; }
+  ~E() { std::cout << "3"; }
+};
+
+E f()
+{ 
+  return E();
+}
+
+int main()
+{
+  f();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+####  The program is guaranteed to output: 13
+
+In f(), an E object is constructed, and 1 is printed. This object is then returned to main(), and one could expect the copy constructor to be called, printing 2.
+
+However, E() is a prvalue and as such does not constitute an object just yet by [basic.lval](https://timsong-cpp.github.io/cppwp/n4659/basic.lval#1)§6.10¶1
+
+    A prvalue is an expression whose evaluation initializes an object or a bit-field, or computes the value of the operand of an operator, as specified by the context in which it appears.
+
+A prvalue only creates a temporary when needed, for instance to create an xvalue. In those cases, a temporary materialization conversion happens ([conv.rval](https://timsong-cpp.github.io/cppwp/n4659/conv.rval#1)§7.4¶1). In this case however, no temporary is needed, and none is created.
+A pr
+[stmt.return](https://timsong-cpp.github.io/cppwp/n4659/stmt.return#2)§9.6.3¶2 says:
+
+    (...) the return statement initializes the glvalue result or prvalue result object of the (explicit or implicit) function call by copy-initialization from the operand.
+
+And copy-initialization for a class-type by [dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#17)§11.6¶17 goes through:
+
+    If the initializer expression is a prvalue and the cv-unqualified version of the source type is the same class as the class of the destination, the initializer expression is used to initialize the destination object.
+
+Which means that no copy or move constructor is called at all. This implies that the copy and move constructor could very well be deleted, and the code would still compile just fine.
+
+The output is thus 13 because of the constructor followed by the destructor call.
+</p>
+</details>
+
+#### 14. :skull::skull:
+```
+#include <iostream>
+
+void f(unsigned int) { std::cout << "u"; }
+void f(int)          { std::cout << "i"; }
+void f(char)         { std::cout << "c"; }
+
+int main() {
+    char x = 1;
+    char y = 2;
+    f(x + y);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+####  The program is unspecified / implementation defined 
+
+The type of the sum of two chars is actually not uniquely specified. We do however know it's not char.
+
+Before being passed to operator +, the operands (x and y) go through a conversion. [expr.add](https://timsong-cpp.github.io/cppwp/n4659/expr.add#1)§8.7¶1:
+
+    The additive operators + and - group left-to-right. The usual arithmetic conversions are performed for operands of arithmetic or enumeration type.
+
+What are "the usual arithmetic conversions"?
+
+[expr](https://timsong-cpp.github.io/cppwp/n4659/expr#11)§8¶11:
+
+    Many binary operators that expect operands of arithmetic or enumeration type cause conversions and yield result types in a similar way. The purpose is to yield a common type, which is also the type of the result. This pattern is called the usual arithmetic conversions, which are defined as follows:
+    - [a bunch of rules for floats, enums etc]
+    - Otherwise, the integral promotions (7.6) shall be performed on both operands
+
+So both chars go through integral promotions. Those are defined in [conv.prom](https://timsong-cpp.github.io/cppwp/n4659/conv.prom#1)§7.6¶1:
+
+    A prvalue of an integer type other than bool, char16_t, char32_t, or wchar_t whose integer conversion rank (7.15) is less than the rank of int can be converted to a prvalue of type int if int can represent all the values of the source type; otherwise, the source prvalue can be converted to a prvalue of type unsigned int.
+
+So a char gets converted to an int if int can fit all possible values of a char. But that's not necessarily the case!
+
+First, int could actually be the same size as char. [basic.fundamental](https://timsong-cpp.github.io/cppwp/n4659/basic.fundamental#2)§6.9.1¶2:
+
+    There are five standard signed integer types : “signed char”, “short int”, “int”, “long int”, and “long long int”. In this list, each type provides at least as much storage as those preceding it in the list.
+
+Note that it says "at least as much storage", it doesn't have to be more. So for instance you could have an sixteen bit system where both char and int are sixteen bits.
+
+Second, char can be either signed or unsigned, it's up to the implementation: [basic.fundamental](https://timsong-cpp.github.io/cppwp/n4659/basic.fundamental#1)§6.9.1¶1:
+
+    It is implementation-defined whether a char object can hold negative values.
+
+int is signed, so if char is also signed, all possible values of char will fit in an int. However, if char is unsigned, and int and char is the same size, char can actually hold larger values than int! In the former case, chars get promoted to ints, but in the latter case, chars get promoted to unsigned int before being summed.
+
+So in practice, most systems will call f(int) and print i, but some might call f(unsigned int) and print u, and they would both be confirming to the standard.
+</p>
+</details>
+
+#### 15. :skull:
+```
+#include <iostream>
+
+struct GeneralException {
+  virtual void print() { std::cout << "G"; }
+};
+
+struct SpecialException : public GeneralException {
+  void print() override { std::cout << "S"; }
+};
+
+void f() { throw SpecialException(); }
+
+int main() {
+  try {
+    f();
+  }
+  catch (GeneralException e) {
+    e.print();
+  }
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: G
+We throw a SpecialException. It is derived from GeneralException, but is caught by value, so e will have the dynamic type GeneralException, not SpecialException. This is known as slicing.
+
+Instead, we should have caught it by reference catch (GeneralException& e), then its dynamic type would be SpecialException, and the program would output S.
+
+</p>
+</details>
+
+### 16. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
@@ -219,111 +588,31 @@ Since a is neither explicitly nor implicitly captured, a in the lambda expressio
 </details>
 
 ```
+#include <iostream>
+
+int a;
+
+int main () {
+    std::cout << a;
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+####  The program is guaranteed to output: 0
+Since a has static storage duration and no initializer, it is guaranteed to be zero-initialized. Had a been defined as a local non-static variable inside main(), this would not have happened.
+
+Note: int a has static storage duration because it is declared at namespace scope. It does not need to have static in front of it, that would only denote internal linkage.
 
 </p>
 </details>
 
+#### :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
-</p>
-</details>
-
-```
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### 
-
+####  
 </p>
 </details>
