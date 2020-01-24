@@ -2209,17 +2209,262 @@ Note: At the time of writing, this program does not confirm to the standard in s
 </p>
 </details>
 
-#### 68. :skull:
+#### 68. :skull::skull:
 ```
+#include <iostream>
+using namespace std;
+
+class A
+{
+public:
+    A() { cout << "A"; }
+    A(const A &) { cout << "a"; }
+};
+
+class B: public virtual A
+{
+public:
+    B() { cout << "B"; }
+    B(const B &) { cout<< "b"; }
+};
+
+class C: public virtual A
+{
+public:
+    C() { cout<< "C"; }
+    C(const C &) { cout << "c"; }
+};
+
+class D:B,C
+{
+public:
+    D() { cout<< "D"; }
+    D(const D &) { cout << "d"; }
+};
+
+int main()
+{
+    D d1;
+    D d2(d1);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: ABCDABCd
+On the first line of main(), d1 is initialized, in the order A, B, C, D. That order is defined by [class.base.init](https://timsong-cpp.github.io/cppwp/n4659/class.base.init#13)§15.6.2¶13:
+"
+— First, and only for the constructor of the most derived class (§4.5), virtual base classes are initialized in the order they appear on a depth-first left-to-right traversal of the directed acyclic graph of base classes, where “left-to-right” is the order of appearance of the base classes in the derived class base-specifier-list.
+— Then, direct base classes are initialized in declaration order as they appear in the base-specifier-list
+(...)
+— Finally, the compound-statement of the constructor body is executed.
+"
+So the output is ABCD.
+
+On the second line, d2 is initialized. But why are the constructors (as opposed to the copy constructors) for the base classes, called? Why do we see ABCd instead of abcd?
+
+As it turns out, an implicitly-defined copy constructor would have called the copy constructor of its bases ([class.copy.ctor](https://timsong-cpp.github.io/cppwp/n4659/class.copy.ctor#14)§15.8.1¶14: "The implicitly-defined copy/move constructor for a non-union class X performs a memberwise copy/move of its bases and members."). But when you provide a user-defined copy constructor, this is something you have to do explicitly.
 </p>
 </details>
 
 #### 69. :skull:
+```   
+#include <iostream>
+#include <map>
+using namespace std;
+
+int main()
+{
+  map<bool,int> mb = {{1,2},{3,4},{5,0}};
+  cout << mb.size(); 
+  map<int,int> mi = {{1,2},{3,4},{5,0}};
+  cout << mi.size();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 13
+std::map stores values based on a unique key. The keys for mb are boolean, and 1, 3 and 5 all evaluate to the same key, true.
+
+[map.overview](https://timsong-cpp.github.io/cppwp/n4659/map.overview#1)§26.4.4.1¶1 in the standard:
+"A map is an associative container that supports unique keys (contains at most one of each key value)."
+
+The type of mb is map<bool,int>. The key is bool, so the integers 1, 3 and 5 used for initialization are first converted to bool, and they all evaluate to true.
+
+[conv.bool](https://timsong-cpp.github.io/cppwp/n4659/conv.bool#1)§7.14¶1 in the standard:
+"A prvalue of arithmetic, unscoped enumeration, pointer, or pointer to member type can be converted to a prvalue of type bool. A zero value, null pointer value, or null member pointer value is converted to false; any other value is converted to true."
+</p>
+</details>
+
+#### 70. :skull::skull:
+```
+#include <iostream>
+using namespace std;
+
+size_t get_size_1(int* arr)
+{
+  return sizeof arr;
+}
+
+size_t get_size_2(int arr[])
+{
+  return sizeof arr;
+}
+
+size_t get_size_3(int (&arr)[10])
+{
+  return sizeof arr;
+}
+
+int main()
+{
+  int array[10];
+  //Assume sizeof(int*) != sizeof(int[10])
+  cout << (sizeof(array) == get_size_1(array));
+  cout << (sizeof(array) == get_size_2(array));
+  cout << (sizeof(array) == get_size_3(array));
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 001
+This question compares three ways for a function to take an array as parameter, while two of them are actually the same.
+
+In main, the array is of array type, therefore the sizeof operator returns the size of the array in terms of bytes. ([expr.sizeof](https://timsong-cpp.github.io/cppwp/n4659/expr.sizeof#2)§8.3.3¶2 in the standard: "When applied to an array, the result [of the sizeof operator] is the total number of bytes in the array. This implies that the size of an array of n elements is n times the size of an element.")
+
+In get_size_3, the parameter is a reference to an array of size 10, therefore the sizeof operator returns the size of the array in terms of bytes. ([expr.sizeof](https://timsong-cpp.github.io/cppwp/n4659/expr.sizeof#2)§8.3.3¶2 in the standard: When applied to a reference or a reference type, the result is the size of the referenced type. )
+
+In get_size_1 and get_size_2, the parameter is a pointer, therefore the sizeof operator returns the size of the pointer. Although the parameter of get_size_2 is an array, it is adjusted into a pointer. ([dcl.fct](https://timsong-cpp.github.io/cppwp/n4659/dcl.fct#5)§11.3.5¶5 in the standard: "any parameter of type “array of T” (...) is adjusted to be “pointer to T”")
+</p>
+</details>
+
+#### 71. :skull::skull::skull:
+```
+#include <iostream>
+#include <limits>
+
+int main()
+{
+  int N[] = {0,0,0};
+
+  if ( std::numeric_limits<long int>::digits==63 &&
+    std::numeric_limits<int>::digits==31 &&
+    std::numeric_limits<unsigned int>::digits==32 )
+  {
+    for (long int i = -0xffffffff; i ; --i)
+    {
+      N[i] = 1;
+    }
+  }
+  else
+  {  
+    N[1]=1;
+  }
+
+  std::cout << N[0] <<N [1] << N[2];
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 010
+As the else part of the branch is obvious, we concentrate on the if part and make the assumptions present in the condition.
+
+[lex.icon](https://timsong-cpp.github.io/cppwp/n4659/lex.icon)§5.13.2 in the standard: "The type of an integer literal is the first of the corresponding list in Table 7 in which its value can be represented." [Table 7: int, unsigned int, long int, unsigned long int ... for hexadecimal literals --end Table]"
+
+Since the literal 0xffffffff needs 32 digits, it can be represented as an unsigned int but not as a signed int, and is of type unsigned int. But what happens with the negative of an unsigned integer?
+
+[expr.unary.op](https://timsong-cpp.github.io/cppwp/n4659/expr.unary.op#8)§8.3.1¶8 in the standard: "The negative of an unsigned quantity is computed by subtracting its value from 2^n, where n is the number of bits in the promoted operand." Here n is 32, and we get:
+
+2^32 - 0xffffffff = 4294967296 - 4294967295 = 1
+
+So i is initialised to 1, and N[1] is the only element accessed in the loop. (The second time around the loop, i is 0, which evaluates to false, and the loop terminates.)
+</p>
+</details>
+
+#### 72. :skull::skull::skull:
+```
+#include<iostream>
+
+int main(){
+  int x=0; //What is wrong here??/
+  x=1;
+  std::cout<<x;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+??/ is a trigraph which doesn't exist anymore in C++17, and as it is in a comment, it is ignored (as anything else).
+
+So the output is 1.
+</p>
+</details>
+
+#### 73. :skull::skull::skull:
+```
+#include <iostream>
+
+volatile int a;
+
+int main() {
+  std::cout << (a + a);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is undefined 
+The issue here is not the missing initializer of the variable a - it will implicitly be initialized to 0 here. But the issue is the access to a twice without sequencing between the accesses. According to [intro.execution](https://timsong-cpp.github.io/cppwp/n4659/intro.execution#14)§4.6¶14, accesses of volatile glvalues are side-effects and according to [intro.execution](https://timsong-cpp.github.io/cppwp/n4659/intro.execution#17)§4.6¶17 these two unsequenced side-effects on the same memory location results in undefined behavior.
+</p>
+</details>
+
+#### 74. :skull::skull:
+```   
+#include <iostream>
+#include <type_traits>
+
+int main()
+{
+    std::cout << std::is_signed<char>::value;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is unspecified / implementation defined 
+[basic.fundamental](https://timsong-cpp.github.io/cppwp/n4659/basic.fundamental#1)§6.9.1¶1
+
+    It is implementation-defined whether a char object can hold negative values.
+</p>
+</details>
+
+#### 75. :skull::skull:
+```    
+#include <iostream>
+#include <type_traits>
+ 
+int main() {
+    if(std::is_signed<char>::value){
+        std::cout << std::is_same<char, signed char>::value;
+    }else{
+        std::cout << std::is_same<char, unsigned char>::value;
+    }
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 0
+[basic.fundamental](https://timsong-cpp.github.io/cppwp/n4659/basic.fundamental#1)§6.9.1¶1
+Plain char, signed char, and unsigned char are three distinct types (...).
+</p>
+</details>
+
+#### 76. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
@@ -2229,7 +2474,7 @@ Note: At the time of writing, this program does not confirm to the standard in s
 </p>
 </details>
 
-#### 70. :skull:
+#### 77. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
@@ -2239,7 +2484,7 @@ Note: At the time of writing, this program does not confirm to the standard in s
 </p>
 </details>
 
-#### 71. :skull:
+#### 78. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
@@ -2249,7 +2494,17 @@ Note: At the time of writing, this program does not confirm to the standard in s
 </p>
 </details>
 
-#### 72. :skull:
+#### 79. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 80. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
