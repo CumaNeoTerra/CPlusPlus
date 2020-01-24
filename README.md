@@ -1159,6 +1159,636 @@ Static local variables are initialized the first time control passes through the
 </details>
 
 #### 35. :skull:
+```   
+#include <iostream>
+
+class A {
+public:
+  virtual void f() { std::cout << "A"; }
+};
+
+class B : public A {
+private:
+  void f() { std::cout << "B"; }
+};
+
+void g(A &a) { a.f(); }
+
+int main() {
+  B b;
+  g(b);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: B
+The "trick" here is that B::f() is called even though it is private.
+
+As [class.access.virt](https://timsong-cpp.github.io/cppwp/n4659/class.access.virt#2)§14.5¶2 in the standard puts it: "Access is checked at the call point using the type of the expression used to denote the object for which the member function is called". The call point here being a.f(), and the type of the expression is A&.
+</p>
+</details>
+
+#### 36. :skull:
+```
+#include <iostream>
+#include <limits>
+
+int main() {
+  unsigned int i = std::numeric_limits<unsigned int>::max();
+  std::cout << ++i;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 0
+Unsigned integers have well defined behaviour when they overflow. When you go one above the largest representable unsigned int, you end up back at zero.
+
+According to [basic.fundamental](https://timsong-cpp.github.io/cppwp/n4659/basic.fundamental#4)§6.9.1¶4 in the C++ standard: "Unsigned integers, declared unsigned, shall obey the laws of arithmetic modulo 2^n where n is the number of bits in the value representation of that particular size of integer."
+</p>
+</details>
+
+#### 37. :skull::skull:
+```
+#include <iostream>
+#include <limits>
+
+int main() {
+  int i = std::numeric_limits<int>::max();
+  std::cout << ++i;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is undefined 
+Signed integer overflow is undefined behaviour according to the standard [expr](https://timsong-cpp.github.io/cppwp/n4659/expr#4)§8¶4: "If during the evaluation of an expression, the result is not mathematically defined or not in the range of representable values for its type, the behavior is undefined."
+
+Most implementations will just wrap around, so if you try it out on your machine, you will probably see the same as if you had done
+std::cout << std::numeric_limits<int>::min();
+
+Relying on such undefined behaviour is however not safe. For an interesting example, see http://stackoverflow.com/questions/7682477/why-does-integer-overflow-on-x86-with-gcc-cause-an-infinite-loop
+</p>
+</details>
+
+#### 38. :skull:
+```
+#include <iostream>
+
+int main() {
+  int i = 42;
+  int j = 1;
+  std::cout << i / --j;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is undefined 
+Integer division by zero is undefined behaviour. According to [expr.mul](https://timsong-cpp.github.io/cppwp/n4659/expr.mul#4)§8.6¶4 in the standard: "If the second operand of / or % is zero the behavior is undefined."
+</p>
+</details>
+
+#### 39. :skull:
+```
+#include <iostream>
+
+struct A {
+  virtual std::ostream &put(std::ostream &o) const {
+    return o << 'A';
+  }
+};
+
+struct B : A {
+  virtual std::ostream &put(std::ostream &o) const {
+    return o << 'B';
+  }
+};
+
+std::ostream &operator<<(std::ostream &o, const A &a) {
+  return a.put(o);
+}
+
+int main() {
+  B b;
+  std::cout << b;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: B
+This is a way to get polymorphic behaviour for operator <<.
+</p>
+</details>
+
+#### 40. :skull:
+```
+#include <iostream>
+
+struct A {
+  A() { std::cout << "A"; }
+  A(const A &a) { std::cout << "B"; }
+  virtual void f() { std::cout << "C"; }
+};
+
+int main() {
+  A a[2];
+  for (auto x : a) {
+    x.f();
+  }
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: AABCBC
+When the array is initialized, the default constructor is called once for each of the two objects in it.
+
+Then we iterate over the array using auto, which in our case is deduced to be A. This means the copy constructor will be called before f() for each iteration, printing BCBC. (Just as if we had written for (A x: a).
+
+If we want to avoid the copy constructor, we can write for (auto& x : a) instead. Then the loop would print CC. (Just as if we had written for (A& x: a).
+</p>
+</details>
+
+#### 41. :skull:
+```
+#include <iostream>
+struct X {
+  X() { std::cout << "X"; }
+};
+
+int main() { X x(); }
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### This program has no output.
+X x(); is a function prototype, not a variable definition. Remove the parentheses (or since C++11, replace them with {}), and the program will output X. 
+</p>
+</details>
+
+#### 42. :skull::skull:
+```
+#include <iostream>
+
+struct X {
+  X() { std::cout << "a"; }
+  X(const X &x) { std::cout << "b"; }
+  const X &operator=(const X &x) {
+    std::cout << "c";
+    return *this;
+  }
+};
+
+int main() {
+  X x;
+  X y(x);
+  X z = y;
+  z = x;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: abbc
+The first line in main(), X x; is straightforward, it calls the default constructor.
+
+The next two lines is the heart of the question: The difference between X y(x) and X z = y is not that the first calls the copy constructor, and the second calls the copy assignment operator. The difference is that the first is direct initialization ([dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#16)§11.6¶16 in the standard) and the second is copy initialization ([dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#15)§11.6¶15).
+
+[dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#17)§11.6¶17 says: "If the initialization is direct-initialization, or if it is copy-initialization where the (...) source type is the same class as (...) the class of the destination, constructors are considered." So both our cases use the copy constructor.
+
+Not until z = x; do we have an actual assignment that uses the assignment operator.
+
+See http://stackoverflow.com/questions/1051379/is-there-a-difference-in-c-between-copy-initialization-and-direct-initializati/1051468#1051468 for a more detailed discussion of direct vs. copy initialization.
+</p>
+</details>
+
+#### 43. :skull:
+```
+#include <iostream>
+#include <vector>
+
+int main() {
+  std::vector<int> v1(1, 2);
+  std::vector<int> v2{ 1, 2 };
+  std::cout << v1.size() << v2.size();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 12
+To answer this we need to look at overload resolution of vector's constructors:
+
+[vector.cons](https://timsong-cpp.github.io/cppwp/n4659/vector.cons#6)§26.3.11.2¶6 says (somewhat redacted):
+vector(size_type n, const T& value);
+Effects: Constructs a vector with n copies of value, using the specified allocator
+
+So v1 contains one "2".
+
+[over.match.list](https://timsong-cpp.github.io/cppwp/n4659/over.match.list)§16.3.1.7 says (in summary) that when non-aggregate classes (such as vector) are list-initialized† and have an initializer list constructor (again, like vector), that constructor is chosen, and the argument list consists of the initializer list as a single argument.
+(†: [dcl.init.list](https://timsong-cpp.github.io/cppwp/n4659/dcl.init.list#1)§11.6.4¶1: List-initialization is initialization of an object or reference from a braced-init-list.)
+
+So v2 is initialized from the elements (aka initializer-clauses) in the braced-init-list, and contains the elements "1" and "2".
+</p>
+</details>
+
+#### 44. :skull:
+```
+#include <iostream>
+
+int main() {
+  int a = 0;
+  decltype(a) b = a;
+  b++;
+  std::cout << a << b;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 01
+According to [dcl.type.simple](https://timsong-cpp.github.io/cppwp/n4659/dcl.type.simple#4)§10.1.7.2¶4 in the C++ standard:
+"The type denoted by decltype(e) is deﬁned as follows:
+— if e is an unparenthesized id-expression [...], decltype(e) is the type of the entity named by e."
+
+The type of a is int, so the type of b is also int.
+</p>
+</details>
+
+#### 45. :skull::skull:
+```
+#include <iostream>
+int main() {
+  std::cout << 1["ABC"];
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: B
+[expr.sub](https://timsong-cpp.github.io/cppwp/n4659/expr.sub#1)§8.2.1¶1 in the standard says "The expression E1[E2] is identical (by definition) to *((E1)+(E2))".
+
+In our case 1["ABC"] is identical to *(1+"ABC"). Since the plus operator is commutative, this is identical to *("ABC"+1), which is identical to the more familiar "ABC"[1].
+</p>
+</details>
+
+#### 46. :skull::skull:
+```
+#include <initializer_list>
+#include <iostream>
+
+struct A {
+  A() { std::cout << "1"; }
+
+  A(int) { std::cout << "2"; }
+
+  A(std::initializer_list<int>) { std::cout << "3"; }
+};
+
+int main(int argc, char *argv[]) {
+  A a1;
+  A a2{};
+  A a3{ 1 };
+  A a4{ 1, 2 };
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1133
+a1 is default initialized, as described in [dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#12)§11.6¶12.
+
+a2 doesn't actually use the initializer_list constructor with a list of zero elements, but the default constructor:
+[dcl.init.list](https://timsong-cpp.github.io/cppwp/n4659/dcl.init.list#3)§11.6¶3:
+List-initialization of an object or reference of type T is defined as follows:
+- (...)
+- Otherwise, if the initializer list has no elements and T is a class type with a default constructor, the object is value-initialized.
+- Otherwise, if T is a specialization of std::initializer_list, the object is constructed as described below.
+
+a3's and a4's constructor is chosen in overload resolution, as described in [over.match.list](https://timsong-cpp.github.io/cppwp/n4659/over.match.list)§16.3.1.7:
+
+"When objects of non-aggregate class type T are list-initialized (...), overload resolution selects the constructor in two phases:
+— Initially, the candidate functions are the initializer-list constructors (§11.6.4) of the class T and the argument list consists of the initializer list as a single argument.
+— If no viable initializer-list constructor is found, overload resolution is performed again, where the candidate functions are all the constructors of the class T and the argument list consists of the elements of the initializer list."
+
+Initializer list constructors are greedy, so even though A(int) constructor is available, the standard mandates that initializer_list<int> is prioritized, and if - and only if - it's not available, the compiler is allowed to look for other constructors. (This is why it is not recommended to provide a constructor that ambiguously overloads with an initializer_list constructor. See the answer to #4 in http://herbsutter.com/2013/05/09/gotw-1-solution/ )
+</p>
+</details>
+
+#### 47. :skull::skull:
+```
+#include <iostream>
+#include <string>
+#include <future>
+
+int main() {
+  std::string x = "x";
+
+  std::async(std::launch::async, [&x]() {
+    x = "y";
+  });
+  std::async(std::launch::async, [&x]() {
+    x = "z";
+  });
+
+  std::cout << x;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: z
+The destructor of a future returned from async is required to block until the async task has finished (see elaboration below). Since we don't assign the futures that are returned from async() to anything, they are destroyed at the end of the full expression (at the end of the line in this case). [class.temporary](https://timsong-cpp.github.io/cppwp/n4659/class.temporary#4)§15.2¶4 in the standard: "Temporary objects are destroyed as the last step in evaluating the full-expression (§4.k) that (lexically) contains the point where they were created."
+
+This means that the first async call is guaranteed to finish execution before async() is called the second time, so, while the assignments themselves may happen in different threads, they are synchronized.
+
+Elaboration on synchronization:
+According to [futures.async](https://timsong-cpp.github.io/cppwp/n4659/futures.async#5)§33.6.9¶5 of the standard:
+Synchronization: Regardless of the policy argument,
+[...]
+If the implementation chooses the launch::async policy,
+— the associated thread completion synchronizes with (§4.1) the return from the first function that successfully detects the ready status of the shared state or with the return from the last function that releases the shared state, whichever happens first.
+
+In this case, the destructor of std::future<> returned by the async() call is "the last function that releases the shared state", therefore it synchronizes with (waits for) the thread completion.
+
+Scott Meyers writes more about this http://scottmeyers.blogspot.com/2013/03/stdfutures-from-stdasync-arent-special.html
+
+</p>
+</details>
+
+#### 48. :skull::skull:
+```
+#include <iostream>
+
+class C {
+public:
+  C(int i) : i(i) { std::cout << i; }
+  ~C() { std::cout << i + 5; }
+
+private:
+  int i;
+};
+
+int main() {
+  const C &c = C(1);
+  C(2);
+  C(3);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 127386
+[class.temporary](https://timsong-cpp.github.io/cppwp/n4659/class.temporary#4)§15.2¶4 in the standard: "Temporary objects are destroyed as the last step in evaluating the full-expression (...) that (lexically) contains the point where they were created." This means that normally the temporaries returned from C(1), C(2), and C(3) should be destroyed at the end of the line.
+
+However: [class.temporary](https://timsong-cpp.github.io/cppwp/n4659/class.temporary#6)§15.2¶6 states: "(...)when a reference is bound to a temporary. The temporary to which the reference is bound (...) persists for the lifetime of the reference", so the lifetime of the temporary returned by C(1) is extended for the lifetime of c, to the end of main(). The temporaries returned by C(2) and C(3) are still destroyed at the end of their lines of creation, so they get destroyed before the one returned by C(1).
+</p>
+</details>
+
+#### 49. :skull:
+```
+#include <iostream>
+
+class A;
+
+class B {
+public:
+  B() { std::cout << "B"; }
+  friend B A::createB();
+};
+
+class A {
+public:
+  A() { std::cout << "A"; }
+
+  B createB() { return B(); }
+};
+
+int main() {
+  A a;
+  B b = a.createB();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+There is a compilation error when attempting to declare A::createB() a friend of B. To declare A::createB() a friend of B, the compiler needs to know that that function exists. Since it has only seen the declaration of A so far, not the full definition, it cannot know this.
+</p>
+</details>
+
+#### 50. :skull::skull:
+```
+#include <iostream>
+
+using namespace std;
+
+class A {
+public:
+  A() { cout << "a"; }
+  ~A() { cout << "A"; }
+};
+
+int i = 1;
+
+int main() {
+label:
+  A a;
+  if (i--)
+    goto label;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: aAaA
+The Standard says this about jump statements:
+
+[stmt.jump](https://timsong-cpp.github.io/cppwp/n4659/stmt.jump#2)§9.6¶2 Transfer [...] back past an initialized variable with automatic storage duration involves the destruction of objects with automatic storage duration that are in scope at the point transferred from but not at the point transferred to.
+</p>
+</details>
+
+#### 51. :skull::skull::skull:
+```
+#include <iostream>
+
+extern "C" int x;
+extern "C" { int y; }
+
+int main() {
+
+	std::cout << x << y;
+
+	return 0;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is undefined
+According to [dcl.link](https://timsong-cpp.github.io/cppwp/n4659/dcl.link#7)§10.5¶7 in the standard : A declaration directly contained in a linkage-specification is treated as if it contains the extern specifier (§10.1.1) for the purpose of determining the linkage of the declared name and whether it is a definition.
+extern "C" int x; //is just a declaration
+extern "C" { int y; } //is a definition
+
+And according to [basic.def.odr](https://timsong-cpp.github.io/cppwp/n4659/basic.def.odr#4)§6.2¶4: "Every program shall contain exactly one definition of every non-inline function or variable that is odr-used in that program outside of a discarded statement; no diagnostic required."
+
+The result: x is never defined but it is optional for the compiler to print an error. The behaviour of this program is undefined.
+</p>
+</details>
+
+#### 52. :skull::skull:
+```
+#include <iostream>
+#include <vector>
+
+int f() { std::cout << "f"; return 0;}
+int g() { std::cout << "g"; return 0;}
+
+void h(std::vector<int> v) {}
+
+int main() {
+    h({f(), g()});
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: fg
+The goal of this question is to demonstrate that the evaluation order of elements in an initializer list is specified (as opposed to the arguments to a function call).
+
+[dcl.init.list](https://timsong-cpp.github.io/cppwp/n4659/dcl.init.list#4)§11.6.4¶4: Within the initializer-list of a braced-init-list, the initializer-clauses, including any that result from pack expansions (§17.5.3), are evaluated in the order in which they appear.
+
+If h took two ints instead of a vector<int>, and was called like this:
+h(f(), g());
+the program would be unspecified, and could either print fg or gf.
+</p>
+</details>
+
+#### 53. :skull::skull::skull:
+```
+#include <functional>
+#include <iostream>
+
+template <typename T>
+void call_with(std::function<void(T)> f, T val)
+{
+	f(val);
+}
+
+int main()
+{
+	auto print = [] (int x) { std::cout << x; };
+	call_with(print, 42);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+The compiler tries to deduce T for every parameter and checks if the deduced types match. Because a lambda is of completely different type, it cannot be matched against std::function<void(T)> and the deduction process fails.
+This problem can be fixed by turning the first parameter into a so-called nondeduced context.
+
+[temp.deduct.type](https://timsong-cpp.github.io/cppwp/n4659/temp.deduct.type#5)§17.8.2.5¶5 in the standard:
+
+    The non-deduced contexts are:
+
+
+        The nested-name-specifier of a type that was specified using a qualified-id.
+
+        (...)
+
+    When a type name is specified in a way that includes a nondeduced context, all of the types that comprise that type name are also nondeduced. However, a compound type can include both deduced and nondeduced types. [Example: If a type is specified as A<T>::B<T2>, both T and T2 are nondeduced. Likewise, if a type is specified as A<I+J>::X<T>, I, J, and T are nondeduced. If a type is specified as void f(typename A<T>::B, A<T>), the T in A<T>::B is nondeduced but the T in A<T> is deduced. ]
+
+In particular, a helper struct template that typedefs the template parameter can be used:
+
+template <typename T>
+struct type_identity
+{
+    typedef T type;
+};
+
+This helper struct can then turn std::function<void(T)> into a nondeduced context as shown in the standard:
+
+template <typename T>
+void call_with(typename type_identity<std::function<void(T)>>::type f, T val)
+{
+    f(val);
+}
+
+std::type_identity is in the C++20 standard, but not C++17.
+
+The problem can also be solved in a less general way (at each call site) by explicitly specifying the template argument:
+
+call_with<int>(print, 42);
+
+
+</p>
+</details>
+
+#### 54. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 55. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 56. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 57. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 58. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 59. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 60. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
