@@ -732,12 +732,438 @@ Finally, we call index() and print the result. index() returns the index of the 
 </p>
 </details>
 
-#### 21. :skull:
+#### 21. :skull::skull::skull:
+```
+#include <iostream>
+
+int main() {
+ int a = 5,b = 2;
+ std::cout << a+++++b;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+Some might expect the lexer to parse the series of characters a+++++b as follows:
+
+a++ + ++b
+
+but according to the [maximal munch principle](https://en.wikipedia.org/wiki/Maximal_munch), the lexer will take the longest sequence of characters to produce the next token(with a few exceptions).
+
+[lex.pptoken](https://timsong-cpp.github.io/cppwp/n4659/lex.pptoken#3)§5.4¶3 in the C++ standard:
+"the next preprocessing token is the longest sequence of characters that could constitute a preprocessing token, even if that would cause further lexical analysis to fail (...)."
+
+So after parsing a++, it is not allowed to just parse +, it has to parse ++. The sequence is thus parsed as:
+
+a ++ ++ + b
+
+which is ill-formed since post-increment requires a modifiable lvalue but the first post-increment will produce a prvalue, as per [expr.post.incr](https://timsong-cpp.github.io/cppwp/n4659/expr.post.incr#1)§8.2.6¶1 in the C++ standard:
+"The value of a postfix ++ expression is the value of its operand. (...) The result is a prvalue."
+</p>
+</details>
+
+#### 22. :skull::skull:
+```    
+#include <iostream>
+
+template <class T> void f(T &i) { std::cout << 1; }
+
+template <> void f(const int &i) { std::cout << 2; }
+
+int main() {
+  int i = 42;
+  f(i);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+For the call f(i), since the type of i is int, template argument deduction deduces T = int.
+
+The explicit specialization template <> void f(const int &i) has T = const int, which is not the same type as int, so it doesn't match.
+
+Instead, template <class T> void f(T &i) with T = int is used to create the implicit instantiation void f<int>(int&).
+</p>
+</details>
+
+#### 23. :skull:
+```
+#include <iostream>
+
+struct A {
+  A() { std::cout << "A"; }
+};
+struct B {
+  B() { std::cout << "B"; }
+};
+
+class C {
+public:
+  C() : a(), b() {}
+
+private:
+  B b;
+  A a;
+};
+
+int main()
+{
+    C();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: BA
+The initialization order of member variables is determined by their order of declaration, not their order in the initialization list.
+</p>
+</details>
+
+#### 24. :skull::skull:
+```
+#include <iostream>
+#include <string>
+
+void f(const std::string &) { std::cout << 1; }
+
+void f(const void *) { std::cout << 2; }
+
+int main() {
+  f("foo");
+  const char *bar = "bar";
+  f(bar);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 22
+A string literal is not a std::string, but a const char[] . If the compiler was to choose f(const std::string&), it would have to go through a user defined conversion and create a temporary std::string. Instead, it prefers f(const void*), which requires no user defined conversion.
+</p>
+</details>
+
+#### 25. :skull:
+```
+#include <iostream>
+
+void f(int) { std::cout << 1; }
+void f(unsigned) { std::cout << 2; }
+
+int main() {
+  f(-2.5);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+This overload is ambiguous. Why?
+
+There are two viable functions for the call f(-2.5). For the compiler to select one, one of them needs to be better than the other, or the program is ill-formed. In our case, they are equally good, making the program ill-formed.
+
+According to [over.match.best](https://timsong-cpp.github.io/cppwp/n4659/over.match.best)§16.3.3 in the standard, a viable one-argument function is better than another if the conversion sequence for the argument is better. So why isn't the int conversion sequence better than the unsigned conversion sequence, given that the double is signed?
+
+All conversions are given a rank, and both "double => int" and "double => unsigned int" are of type "floating-integral conversion", which has rank "conversion". See Table 13 in the standard and [conv.fpint](https://timsong-cpp.github.io/cppwp/n4659/conv.fpint)§7.10. Since they have the same rank, no conversion is better than the other, and the program is ill-formed.
+</p>
+</details>
+
+#### 26. :skull:
+```
+#include <iostream>
+
+void f(float) { std::cout << 1; }
+void f(double) { std::cout << 2; }
+
+int main() {
+  f(2.5);
+  f(2.5f);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 21
+The type of a floating point literal is double.
+</p>
+</details>
+
+#### 27. :skull:
+```
+#include <iostream>
+
+int main() {
+  for (int i = 0; i < 3; i++)
+    std::cout << i;
+  for (int i = 0; i < 3; ++i)
+    std::cout << i;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 012012
+Whether you post-increment or pre-increment i, its value does not change until after the loop body has executed.
+
+</p>
+</details>
+
+#### 28. :skull:
+```
+#include <iostream>
+
+class A {
+public:
+  void f() { std::cout << "A"; }
+};
+
+class B : public A {
+public:
+  void f() { std::cout << "B"; }
+};
+
+void g(A &a) { a.f(); }
+
+int main() {
+  B b;
+  g(b);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: A
+As long as A::f() is not virtual, A::f() will always be called, even if the reference or pointer is actually referring to an object of type B.
+</p>
+</details>
+
+#### 29. :skull:
+``` 
+#include <iostream>
+
+class A {
+public:
+  virtual void f() { std::cout << "A"; }
+};
+
+class B : public A {
+public:
+  void f() { std::cout << "B"; }
+};
+
+void g(A a) { a.f(); }
+
+int main() {
+  B b;
+  g(b);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: A
+g(A a) takes an object of type A by value, not by reference or pointer. This means that A's copy constructor is called on the object passed to g() (no matter if the object we passed was of type B), and we get a brand new object of type A inside g(). This is commonly referred to as slicing.
+</p>
+</details>
+
+#### 30. :skull:
+```
+#include <iostream>
+
+int f(int &a, int &b) {
+  a = 3;
+  b = 4;
+  return a + b;
+}
+
+int main() {
+  int a = 1;
+  int b = 2;
+  int c = f(a, a);
+  std::cout << a << b << c;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 428
+When f() is called with a as both parameters, both arguments refer to the same variable. This is known as aliasing. First, a is set to 3, then a is set to 4, then 4+4 is returned. b is never modified.
+</p>
+</details>
+
+#### 31. :skull:
+```
+#include <iostream>
+
+int main() {
+  static int a;
+  std::cout << a;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 0
+Since a is a static local variable, it is automatically zero-initialized. This would not have happened if we removed the keyword static, making it a non-static local variable.
+
+[basic.start.static](https://timsong-cpp.github.io/cppwp/n4659/basic.start.static#2)§6.6.2¶2 in the standard:
+
+    If constant initialization is not performed, a variable with static storage duration (6.7.1) or thread storage duration (6.7.2) is zero-initialized (11.6)
+
+a has static storage duration and is not constant initialized , so it gets zero-initialized.
+
+[dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#6)§11.6¶6:
+
+    To zero-initialize an object or reference of type T means:
+    — if T is a scalar type (6.9), the object is initialized to the value obtained by converting the integer literal 0 (zero) to T;
+
+So a gets initialized to 0.
+</p>
+</details>
+
+#### 32. :skull:
+```
+#include <iostream>
+
+class A {
+public:
+  A() { std::cout << "a"; }
+  ~A() { std::cout << "A"; }
+};
+
+class B {
+public:
+  B() { std::cout << "b"; }
+  ~B() { std::cout << "B"; }
+};
+
+class C {
+public:
+  C() { std::cout << "c"; }
+  ~C() { std::cout << "C"; }
+};
+
+A a;
+int main() {
+  C c;
+  B b;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: acbBCA
+[basic.start.dynamic](https://timsong-cpp.github.io/cppwp/n4659/basic.start.dynamic#5)§6.6.3¶5 in the standard:
+"It is implementation-defined whether the dynamic initialization of a non-local inline variable with static storage duration is sequenced before the first statement of main or is deferred. If it is deferred, it strongly happens before any non-initialization odr-use of that variable."
+
+Since A() is not constexpr, the initialization of a is dynamic. There are two possibilities:
+- a is initialized before main() is called, i.e. before b or c are initialized.
+- a is not initialized before main(). It is however guaranteed to be initialized before the the use of any function defined in the same translation unit, i.e. before the constructors of b and c are called.
+
+Then, b and c are initialized in order.
+
+Before main() exits, b and c are destructed in the reverse order of their construction. Then, when main() returns, a is destructed as per §6.6.4 in the standard:
+"Destructors for initialized objects (...) with static storage duration are called as a result of returning from main."
+</p>
+</details>
+
+#### 33. :skull::skull:
+```
+#include <iostream>
+
+class A {
+public:
+  A() { std::cout << "a"; }
+  ~A() { std::cout << "A"; }
+};
+
+class B {
+public:
+  B() { std::cout << "b"; }
+  ~B() { std::cout << "B"; }
+};
+
+class C {
+public:
+  C() { std::cout << "c"; }
+  ~C() { std::cout << "C"; }
+};
+
+A a;
+
+void foo() { static C c; }
+int main() {
+  B b;
+  foo();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: abcBCA
+[basic.start.dynamic](https://timsong-cpp.github.io/cppwp/n4659/basic.start.dynamic#4)§6.6.3¶4 in the standard:
+"It is implementation-defined whether the dynamic initialization of a non-local non-inline variable with static storage duration is sequenced before the first statement of main or is deferred. If it is deferred, it strongly happens before any non-initialization odr-use of any non-inline function or non-inline variable defined in the same translation unit as the variable to be initialized."
+
+Since A() is not constexpr, the initialization of a is dynamic. There are two possibilities:
+- a is initialized before main() is called, i.e. before b is initialized.
+- a is not initialized before main(). It is however guaranteed to be initialized before the the use of any function defined in the same translation unit, i.e. before the constructor of b is called.
+
+When execution reaches B b, it is initialized as normal. Static local variables are initialized the first time control passes through their declaration, so c is initialized next. As main() is exited, its local variable b goes out of scope, and is destroyed. Finally, all static variables are destroyed in reverse order of their initialization, first c, then a.
+</p>
+</details>
+
+#### 34. :skull::skull::skull:
+```
+#include <iostream>
+#include <exception>
+
+int x = 0;
+
+class A {
+public:
+  A() {
+    std::cout << 'a';
+    if (x++ == 0) {
+      throw std::exception();
+    }
+  }
+  ~A() { std::cout << 'A'; }
+};
+
+class B {
+public:
+  B() { std::cout << 'b'; }
+  ~B() { std::cout << 'B'; }
+  A a;
+};
+
+void foo() { static B b; }
+
+int main() {
+  try {
+    foo();
+  }
+  catch (std::exception &) {
+    std::cout << 'c';
+    foo();
+  }
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: acabBA
+Static local variables are initialized the first time control passes through their declaration. The first time foo() is called, b is attempted initialized. Its constructor is called, which first constructs all member variables. This means A::A() is called, printing a. A::A() then throws an exception, the constructor is aborted, and neither b or B::a are actually considered constructed. In the catch-block, c is printed, and then foo() is called again. Since b was never initialized the first time, it tries again, this time succeeding, printing ab. When main() exits, the static variable b is destroyed, first calling the destructor printing B, and then destroying member variables, printing A. 
+</p>
+</details>
+
+#### 35. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-####  
+#### 
 </p>
 </details>
