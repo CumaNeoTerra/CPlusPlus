@@ -1730,65 +1730,526 @@ call_with<int>(print, 42);
 
 #### 54. :skull:
 ```
+#include <iostream>
+
+int main() {
+    int i=1;
+    do {
+        std::cout << i;
+        i++;
+        if(i < 3) continue;
+    } while(false);
+    return 0;
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 1
+[stmt.cont](https://timsong-cpp.github.io/cppwp/n4659/stmt.cont#1)§9.6.2¶1 in the standard: "The continue statement (...) causes control to pass to the loop-continuation portion of the smallest enclosing iteration-statement, that is, to the end of the loop." (Not to the beginning.)
 </p>
 </details>
 
-#### 55. :skull:
+#### 55. :skull::skull:
 ```
+    
+#include <iostream>
+#include <utility>
+
+struct A
+{
+	A() { std::cout << "1"; }
+	A(const A&) { std::cout << "2"; }
+	A(A&&) { std::cout << "3"; }
+};
+
+struct B
+{
+	A a;
+	B() { std::cout << "4"; }
+	B(const B& b) : a(b.a) { std::cout << "5"; }
+	B(B&& b) : a(b.a) { std::cout << "6"; }
+};
+
+int main()
+{
+	B b1;
+	B b2 = std::move(b1);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 1426
+First, b1 is default initialized. All members are initialized before the body of the constructor, so b1.a is default initialized first, and we get the output 14.
+
+[class.base.init](https://timsong-cpp.github.io/cppwp/n4659/class.base.init#9)§15.6.2¶9 in the standard: "In a non-delegating constructor, if a given potentially constructed subobject designated by a
+mem-initializer-id (...) then if the entity is a non-static data member that has a default member initializer (§12.2), (...) the entity is initialized as specified in §11.6 (...) otherwise, the entity is default-initialized."
+
+Then, b2 is initialized with the move construcor (since std::move(b1)converts the reference to b1 to an xvalue, allowing it to be moved from.) In B's move constructor, a is initialized in the member initializer list. Even though b is an rvalue reference (and bound to an rvalue), b itself is an lvalue, and cannot be moved from. b2.a is then copy initialized, printing 2, and finally the body of B's move constructor prints 6.
+
+(If the concept of rvalue references being lvalues is confusing, read http://isocpp.org/blog/2012/11/universal-references-in-c11-scott-meyers . Search for "In widget".)
 </p>
 </details>
 
 #### 56. :skull:
 ```
+#include <iostream>
+#include <memory>
+#include <vector>
+
+class C {
+public:
+  void foo()       { std::cout << "A"; }
+  void foo() const { std::cout << "B"; }
+};
+
+struct S {
+  std::vector<C> v;
+  std::unique_ptr<C> u;
+  C *const p;
+
+  S() 
+    : v(1) 
+    , u(new C())
+    , p(u.get())
+  {}
+};
+
+int main() {
+  S s;
+  const S &r = s;
+ 
+  s.v[0].foo();
+  s.u->foo();
+  s.p->foo();
+
+  r.v[0].foo();
+  r.u->foo();
+  r.p->foo();
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: AAABAA
+According to [dcl.ptr](https://timsong-cpp.github.io/cppwp/n4659/dcl.ptr#1)§11.3.1¶1 in the C++ Standard, "The cv-qualifiers [e.g., const] apply to the pointer and not to the object pointed to."
+
+That is, const-ness is shallow with regards to raw pointers and references (and standard types that seek to emulate them, like std::unique_ptr) but not with regard to standard containers such as std::vector.
+
+In the code above, the object s is non-const, and so its members all retain their default const-ness and all calls through them invoke the non-const version of C::foo().
+
+However, r refers to its object as a const instance of S. That const-ness changes the behavior of its member v, an std::vector which is "const-correct" in the sense that its operator[] returns const C& (see [sequence.reqmts](https://timsong-cpp.github.io/cppwp/n4659/sequence.reqmts#14)§26.2.3¶14) and therefore invokes the const version of C::foo().
+
+The const-ness of r's referent is also propagated to its members u and p (meaning one could not perform a mutating operation on u, e.g., calling r.u.reset()), but this has no effect on the instance of C that they both point to. That is, the pointers themselves become const, but the pointed-to objects remain non-const. Hence, they both still call the non-const version of C::foo().
+
+The const-ness of the member S::p is the same for both s and r. Because it is declared as a const pointer, it does not change const-ness to follow the const-ness of its instance of S but remains a const pointer to a non-const object.
 </p>
 </details>
 
 #### 57. :skull:
 ```
+#include <iostream>
+
+void f(int) { std::cout << "i"; }
+void f(double) { std::cout << "d"; }
+void f(float) { std::cout << "f"; }
+
+int main() {
+  f(1.0);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: d
+According to [lex.fcon](https://timsong-cpp.github.io/cppwp/n4659/lex.fcon#1)§5.13.4¶1 in the standard: "The type of a floating literal is double unless explicitly specified by a suffix."
+The best overload is therefore void f(double).
 </p>
 </details>
 
 #### 58. :skull:
 ```
+#include <iostream>
+
+void print(char const *str) { std::cout << str; }
+void print(short num) { std::cout << num; }
+
+int main() {
+  print("abc");
+  print(0);
+  print('A');
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program has a compilation error 
+Sneaky ambiguous function call.
+
+The statement print(0); is ambiguous due to overload resolution rules. Both print functions are viable, but for the compiler to pick one, one of them has to have a better conversion sequence than the other. [over.match.best](https://timsong-cpp.github.io/cppwp/n4659/over.match.best#2)§16.3.3¶2: "If there is exactly one viable function that is a better function than all other viable functions, then it is the one selected by overload resolution; otherwise the call is ill-formed".
+
+(a) Because 0 is a null pointer constant[1], it can be converted implicitly into any pointer type with a single conversion.
+
+(b) Because 0 is of type int, it can be converted implicitly to a short with a single conversion too.
+
+In our case, both are standard conversion sequences with a single conversion of "conversion rank". Since no function is better than the other, the call is ill-formed.
+
+[1] [conv.ptr](https://timsong-cpp.github.io/cppwp/n4659/conv.ptr#1)§7.11¶1 A null pointer constant is an integer literal (§5.13.2) with value zero or a prvalue of type std::nullptr_t. A null pointer constant can be converted to a pointer type.
 </p>
 </details>
 
-#### 59. :skull:
+#### 59. :skull::skull:
 ```
+#include <iostream>
+
+int main() {
+  void * p = &p;
+  std::cout << bool(p);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 1
+As defined in [basic.scope.pdecl](https://timsong-cpp.github.io/cppwp/n4659/basic.scope.pdecl#1)§6.3.2¶1, the point of name declaration is after its
+complete declarator and before its initialisation. This
+means that line 4 is valid C++, because it's possible
+to initialise the variable p with the address of an existing
+variable, even if it is its own address.
+
+The value of p is unknown, but can not be a null pointer value. The
+cast must thus evaluate to 1 and initialise the temporary
+bool as true.
 </p>
 </details>
 
 #### 60. :skull:
+```
+int main() {
+  int a = 10;
+  int b = 20;
+  int x;
+  x = a, b;
+  std::cout << x;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 10
+The comma operator has the lowest precedence of all C++ operators (specifically lower than =).
+In this example it separates the two expressions x = a and b.
+
+First x = a is evaluated, setting x to 10.
+Then, b is evaluated, which does nothing.
+</p>
+</details>
+
+#### 61. :skull::skull::skull:
+```
+#include <iostream> 
+
+typedef long long ll;
+
+void foo(unsigned ll) {
+    std::cout << "1";
+}
+
+void foo(unsigned long long) {
+    std::cout << "2";
+}
+
+int main() {
+    foo(2ull);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 2
+[dcl.spec](https://timsong-cpp.github.io/cppwp/n4659/dcl.spec#3)§10.1¶3 in the C++ standard states, "If a type-name is encountered while parsing a decl-speciﬁer-seq, it is interpreted as part of the decl-speciﬁer-seq if and only if there is no previous defining-type-speciﬁer other than a cv-qualiﬁer in the decl-speciﬁer-seq."
+
+[dcl.spec](https://timsong-cpp.github.io/cppwp/n4659/dcl.spec#4)§10.1¶4 also has a note: "Since signed, unsigned, long, and short by default imply int, a type-name appearing after one of those speciﬁers is treated as the name being (re)declared."
+
+In void foo(unsigned ll), since unsigned implies int, ll is being redeclared as a parameter name.
+</p>
+</details>
+
+#### 62. :skull::skull::skull:
+```
+#include <iostream>
+
+using namespace std;
+
+struct A {};
+struct B {};
+
+template<typename T = A>
+struct X;
+
+template<>
+struct X<A> {
+   static void f() { cout << 1 << endl; }
+};
+
+template<>
+struct X<B> {
+   static void f() { cout << 2 << endl; }
+};
+
+template< template<typename T = B> class C>
+void g() {
+   C<>::f();
+}
+
+int main() {
+   g<X>();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 2
+[temp.param](https://timsong-cpp.github.io/cppwp/n4659/temp.param#14)§17.1¶14 in the C++ standard says: "A template-parameter of a template template-parameter is permitted to have a default template-argument.
+When such default arguments are specified, they apply to the template template-parameter in the scope of
+the template template-parameter."
+
+In this case, the template template-parameter is C, and the scope of C is the function g(), so the default arguments of C (i.e. T = B) are applied and C::f() is called inside g().
+</p>
+</details>
+
+#### 63. :skull::skull:
+```
+#include <iostream>
+
+using namespace std;
+
+template <class T> void f(T) {
+  static int i = 0;
+  cout << ++i;
+}
+
+int main() {
+  f(1);
+  f(1.0);
+  f(1);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 112
+[temp.fct.spec](https://timsong-cpp.github.io/cppwp/n4659/temp.fct.spec#2)§17.8¶2: Each function template specialization instantiated from a template has its own copy of any static variable.
+
+This means we get two instantiations of f, one for T=int, and one for T=double. Thus, i is shared between the two int calls, but not with the double call.
+</p>
+</details>
+
+#### 64. :skull::skull:
+```
+#include<iostream>
+
+int foo()
+{
+  return 10;
+}
+
+struct foobar
+{
+  static int x;
+  static int foo()
+  {
+    return 11;
+  }
+};
+
+int foobar::x = foo();
+
+int main()
+{
+    std::cout << foobar::x;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 11
+[basic.lookup.unqual](https://timsong-cpp.github.io/cppwp/n4659/basic.lookup.unqual#13)§6.4.1¶13 states "A name used in the definition of a static data member of class X (...) is looked up as if the name was used in a member function of X."
+
+Even though the call foo() occurs outside the class, since foo is used in the definition of the static data member foobar::x, it is looked up as if foo() was called in a member function of foobar. If foo() was called in a member function of foobar, foobar::foo() would be called, not the global foo().
+</p>
+</details>
+
+#### 65. :skull::skull::skull:
+```
+#include <iostream>
+#include <type_traits>
+
+using namespace std;
+
+int main()
+{
+  int i, &j = i;
+  [=]
+  {
+    cout << is_same<decltype    ((j)),     int         >::value
+         << is_same<decltype   (((j))),    int      &  >::value
+         << is_same<decltype  ((((j)))),   int const&  >::value
+         << is_same<decltype (((((j))))),  int      && >::value
+         << is_same<decltype((((((j)))))), int const&& >::value;
+  }();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 00100
+[expr.prim.lambda.capture](https://timsong-cpp.github.io/cppwp/n4659/expr.prim.lambda.capture#14)§8.1.5.2¶14 says
+Every occurrence of decltype((x)) where x is a possibly parenthesized id-expression that names an entity of automatic storage duration is treated as if x were transformed into an access to a corresponding data member of the closure type that would have been declared if x were an odr-use of the denoted entity.
+
+So additional parentheses, as the in the code snippet above, are ignored.
+
+The member of the closure type corresponding to the as-if-captured j will be not a reference, but will have the referenced type of the reference, since it is captured by copy ([expr.prim.lambda.capture](https://timsong-cpp.github.io/cppwp/n4659/expr.prim.lambda.capture#10)§8.1.5.2¶10).
+
+Since the lambda is not declared mutable, the overloaded operator() of the closure type will be a const member function. [expr.prim.lambda.closure](https://timsong-cpp.github.io/cppwp/n4659/expr.prim.lambda.closure#4)§8.1.5.1¶4: "The function call operator or operator template is declared const if and only if the lambda-expression's parameter-declaration-clause is not followed by mutable."
+
+Since the expression for decltype is a parenthesized lvalue expression, [dcl.type.simple](https://timsong-cpp.github.io/cppwp/n4659/dcl.type.simple#4)§10.1.7.2¶4 has this to say: "The type denoted by decltype(e) is (...) T&, where T is the type of e;" As the expression occurs inside a const member function, the expression is const, and decltype((j)) denotes int const&. See also the example in [expr.prim.lambda.capture](https://timsong-cpp.github.io/cppwp/n4659/expr.prim.lambda.capture#14)§8.1.5.2¶14.
+</p>
+</details>
+
+#### 66. :skull::skull:
+```
+#include <vector>
+#include <iostream>
+
+using namespace std;
+
+int main() {
+  vector<char> delimiters = { ",", ";" };  
+  cout << delimiters[0];
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is undefined 
+Here we are trying to initialize a vector<char> using two string literals, not two chars.
+
+The initializer-list constructor for template <class T>vector is defined as vector(initializer_list<T>) by [vector.overview](https://timsong-cpp.github.io/cppwp/n4659/vector.overview)§26.3.11.1 in the standard. In our case, vector(initializer_list<char>).
+
+The type of a string literal is "array of n const char" ([lex.string](https://timsong-cpp.github.io/cppwp/n4659/lex.string#8)§5.13.5¶8), so clearly the initializer-list constructor is not a match.
+
+This problem does however not result in a compiler error, since the compiler is able to find another constructor that matches!
+
+[over.match.list](https://timsong-cpp.github.io/cppwp/n4659/over.match.list#1)§16.3.1.7¶1 explains the rules very clearly:
+"When objects of non-aggregate class type T are list-initialized (...), overload resolution selects the constructor in two phases:
+— Initially, the candidate functions are the initializer-list constructors of the class T and the argument list consists of the initializer list as a single argument [which we have seen didn't match].
+— If no viable initializer-list constructor is found, overload resolution is performed again, where the candidate functions are all the constructors of the class T and the argument list consists of the elements of the initializer list [in our case, the two string literals "," and ";" ]".
+
+Going back to [vector.overview](https://timsong-cpp.github.io/cppwp/n4659/vector.overview)§26.3.11.1, we find this candidate:
+
+template <class InputIterator> vector(InputIterator first, InputIterator last)
+
+Note that the type of InputIterator has no link to the type of T in the vector<T>. So even if we are initializing a vector<char>, the two arguments can be of arbitrary type. The only requirement is that they confirm to the concept of InputIterator, which const char[] happens to do.
+
+Now the constructor believes it has been passed two iterators to the same sequence, but it has actually been passed iterators to two completely different sequences, "," and ";". [forward.iterators](https://timsong-cpp.github.io/cppwp/n4659/forward.iterators#2)§27.2.5¶2 says: "The domain of == for forward iterators is that of iterators over the same underlying sequence.". So the result of this program is undefined.
+</p>
+</details>
+
+#### 67. :skull::skull::skull:
+```
+#include <iostream>
+using namespace std;
+
+template<typename T>
+void adl(T)
+{
+  cout << "T";
+}
+
+struct S
+{
+};
+
+template<typename T>
+void call_adl(T t)
+{
+  adl(S());
+  adl(t);
+}
+
+void adl(S)
+{
+  cout << "S";
+}
+
+int main ()
+{
+  call_adl(S());
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: TS
+[temp.res](https://timsong-cpp.github.io/cppwp/n4659/temp.res#9)§17.6¶9 states: "When looking for the declaration of a name used in a template definition, the usual lookup rules (§6.4.1, §6.4.2) are used for non-dependent names. The lookup of names dependent on the template parameters is postponed until the actual template argument is known (§17.6.2)."
+
+The first call to adl is a non-dependent call, so it is looked up at the time of definition of the function template. The resolution of the second call is deferred until the template is instantiated because it depends on a template parameter.
+
+template<typename T> void call_adl_function(T t)
+{
+    adl(S()); // Independent, looks up adl now.
+    adl(t); // Dependent, looks up adl later.
+}
+
+When adl is being looked up at the time of definition of the function template, the only version of adl that exists is the templated adl(T). Specifically, adl(S) does not exist yet, and is not a candidate.
+
+Note: At the time of writing, this program does not confirm to the standard in some recent versions of Visual Studio's C++ compiler.
+</p>
+</details>
+
+#### 68. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 69. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 70. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 71. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 72. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
