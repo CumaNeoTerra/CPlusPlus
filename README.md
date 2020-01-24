@@ -3404,7 +3404,803 @@ m.emplace(7, C(1));
 </p>
 </details>
 
-#### 101. :skull:
+#### 101. :skull::skull::skull:
+```
+#include <iostream>
+
+int main() {
+    int i = 1;
+    int const& a = i > 0 ? i : 1;
+    i = 2;
+    std::cout << i << a;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 21
+The question here is whether a is a reference to i or not. If it is, the value of a changes when we do i=2. If not, a is not modified by that line.
+
+The type and value category of the conditional expression depends on the types and value categories of the second and third expressions, in this case i and 1. For instance, if both were lvalue ints, the result would be an lvalue int. In this case however, i is an lvalue, and 1 is a prvalue, so things are a bit more complicated.
+
+[expr.cond](https://timsong-cpp.github.io/cppwp/n4659/expr.cond)§8.16 in the standard has the details. After ruling out a bunch of options in ¶2-¶5 (none of them are void, none of them are of class type, they don't have the same value category, they aren't both a glvalue) [expr.cond](https://timsong-cpp.github.io/cppwp/n4659/expr.cond#6)§8.16¶6 says:
+"Otherwise, the result is a prvalue"
+
+So the expression i > 0 ? i : 1; is a prvalue, in other words a temporary. The reference a is bound to that temporary, not to i itself, and i = 2 ends up not modifying a. After i = 2, i is now 2, but a is still 1, and the output of the program is 21.
+</p>
+</details>
+
+#### 102. :skull::skull:
+```
+#include <iostream>
+
+template<typename T>
+T sum(T arg) {
+    return arg;   
+}
+
+template<typename T, typename ...Args>
+T sum(T arg, Args... args) {    
+    return arg + sum<T>(args...);
+}
+
+int main() {
+    auto n1 = sum(0.5, 1, 0.5, 1);
+    auto n2 = sum(1, 0.5, 1, 0.5);
+    std::cout << n1 << n2;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 32
+T sum(T arg, Args... args) is a function template which calls itself recursively until it hits the base case T sum(T arg). For instance, sum(a₁, a₂, a₃, a₄) is implemented as a₁ + sum(a₂, a₃, a₄).
+
+When no T is specified, T is deduced to be the type of the first argument to sum. In the case of n1, T is deduced to double (the type of 0.5), and in the case of n2, T is deduced to int (the type of 1).
+
+However, when sum calls itself, it explicitly specifies T (it does sum<T>(args...)). So T is only deduced on the initial call to sum, and this T is used for all the subsequent recursive calls, no matter the type of the arguments along the way.
+
+For n1, T is always double, so sum always takes a double as the first parameter, and returns a double. The sum is (0.5 + (1 + (0.5 + (1)))) == 3. (Each set of parentheses denotes a recursive call to sum).
+
+For n2 however, T is always int, so sum always takes an int as the first parameter, and returns a int, even when we pass 0.5. What happens when we pass a double argument to an int parameter? According to [conv.fpint](https://timsong-cpp.github.io/cppwp/n4659/conv.fpint#1)§7.10¶1 in the C++ standard:
+
+    A prvalue of a floating point type can be converted to a prvalue of an integer type. The conversion truncates; that is, the fractional part is discarded.
+
+So in the case of n2, each time we pass 0.5, it gets truncated to 0, and the sum is (0 + (1 + (0 + (1)))) == 2.
+</p>
+</details>
+
+#### 103. :skull:
+```
+#include <iostream>
+
+bool f() { std::cout << 'f'; return false; }
+char g() { std::cout << 'g'; return 'g'; }
+char h() { std::cout << 'h'; return 'h'; }
+
+int main() {
+    char result = f() ? g() : h();
+    std::cout << result;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: fhh
+f() evaluates to false, so the value of the whole conditional expression is the value of the third expression h(), that is the character h. But which functions are evaluated, and in which order?
+
+Let's have a look at [expr.cond](https://timsong-cpp.github.io/cppwp/n4659/expr.cond#1)§8.16¶1 in the standard:
+"Every value computation and side effect associated with the first expression is sequenced before every value computation and side effect associated with the second or third expression."
+
+This means that f() completes before g() or h(), and f is the first thing to get printed.
+
+The second question is whether both g() and h() are called before the resulting value is selected, or if only one of them are. Again, [expr.cond](https://timsong-cpp.github.io/cppwp/n4659/expr.cond#1)§8.16¶1 has the answer:
+"Only one of the second and third expressions is evaluated."
+Since f() evaluated to false, h() is selected, h(), and h is printed. g() is never called.
+
+Finally, on the last line, the value of result, h is printed.
+</p>
+</details>
+
+#### 104. :skull::skull:
+```
+#include <iostream>
+
+struct Base {
+    virtual int f() = 0; 
+};
+
+int Base::f() { return 1; }
+
+struct Derived : Base {
+    int f() override;
+};
+
+int Derived::f() { return 2; }
+
+int main() {
+    Derived object;
+    std::cout << object.f();
+    std::cout << ((Base&)object).f();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 22
+Providing a definition for a pure virtual function is valid, as long as it is not defined directly in the function declaration. So defining Base::f() outside of Base is ok.
+
+[class.abstract](https://timsong-cpp.github.io/cppwp/n4659/class.abstract#2)§13.4¶2 in the C++ standard:
+
+    A pure virtual function need be defined only if called with, or as if with (§15.4), the qualified-id syntax (§8.1).
+
+This implicitly says that a pure virtual function can in fact be defined. Furthermore:
+
+    A function declaration cannot provide both a pure-specifier and a definition
+
+Which is why we have to define it outside the declaration[1]. Now to the output of the program:
+
+object.f() calls Derived::f(), returning 2.
+
+((Base&)object).f() casts object to a Base& before calling f(), but since f() is a virtual function, Derived::f() is still called, returning 2.
+
+[1]: This is a non-normative note; the actual normative wording that disallows it is the grammar for a function-definition does not include a pure-specifier.
+</p>
+</details>
+
+#### 105. :skull::skull:
+```
+#include <iostream>
+
+struct X {
+    X() { std::cout << "1"; }
+    X(const X &) { std::cout << "3"; }
+    ~X() { std::cout << "2"; }
+
+    void f() { std::cout << "4"; }
+
+} object;
+
+int main() {
+    X(object);
+    object.f();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 11422
+First, a global X object is created, printing 1.
+
+Then main is called, and we get to the line X(object);. This can be interpreted in two ways:
+1. As creating a temporary unnamed copy of object.
+2. As creating a new variable of type X named object. This is easier to see if you remove the parentheses, and it becomes just X object.
+
+[stmt.ambig](https://timsong-cpp.github.io/cppwp/n4659/stmt.ambig#1)§9.8¶1 in the C++ standard says:
+
+    An expression-statement with a function-style explicit type conversion (§8.2.3) as its leftmost subexpression can be indistinguishable from a declaration where the first declarator starts with a (. In those cases the statement is a declaration.
+
+So X(object) is in fact a declaration of a new variable object (which shadows the global object). The constructor is called, and 1 is printed again.
+
+We then call f(), and 4 is printed.
+
+Next, main exits, and the local object is destroyed, printing 2. Finally, the global object is destroyed, again printing 2.
+</p>
+</details>
+
+#### 106. :skull::skull:
+```
+    
+#include <iostream>
+#include <utility>
+
+struct X {
+    X() { std::cout << "1"; }
+    X(X &) { std::cout << "2"; }
+    X(const X &) { std::cout << "3"; }
+    X(X &&) { std::cout << "4"; }
+    ~X() { std::cout << "5"; }
+};
+
+struct Y {
+    mutable X x;
+    Y() = default;
+    Y(const Y &) = default;
+};
+
+int main() {
+    Y y1;
+    Y y2 = std::move(y1);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1255
+First, the line
+
+Y y1;
+
+creates an instance of Y. Y has an X data member, which is default constructed, printing 1.
+
+Then,
+
+Y y2 = std::move(y1);
+
+copy-initializes another Y. The std::move turns y1 into an rvalue, but since Y has no move constructor, its copy constructor is called. The implicitly-defined copy-constructor performs a copy of x, as specified in [class.copy.ctor](https://timsong-cpp.github.io/cppwp/n4659/class.copy.ctor#14)§15.8.1¶14:
+
+    The implicitly-defined copy/move constructor for a non-union class X performs a memberwise copy/move of its bases and members.
+
+Now the question is which copy constructor is used to initialize the copy of x. Will it pick X(X &) or X(const X &)? The Y inside the Y(const Y &) copy constructor is const, but x is marked mutable, and [dcl.stc](https://timsong-cpp.github.io/cppwp/n4659/dcl.stc#9)§10.1.1¶9 says:
+
+    The mutable specifier on a class data member nullifies a const specifier applied to the containing class object and permits modification of the mutable class member even though the rest of the object is const
+
+So x is considered non-const, and X(X &) is a better match to overload resolution than X(const X &), because in the latter case, a const conversion has to happen. So X(X &) is called, printing 2.
+
+Finally, both y1 and y2 are destroyed at the end of main, printing 55.
+</p>
+</details>
+
+#### 107. :skull:
+```
+#include <iostream>
+
+using Func = int();
+
+struct S {
+    Func f;
+};
+
+int S::f() { return 1; }
+
+int main() {
+    S s;
+    std::cout << s.f();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+using Func = int() is an alias-declaration introducing the typedef-name Func for a function taking no parameters and returning an int.
+
+This typedef-name can be used both for free functions and, as in this question, for member functions. [class.mfct](https://timsong-cpp.github.io/cppwp/n4659/class.mfct#8)§12.2.1¶8 in the C++ standard:
+
+    [Note: A member function can be declared (but not defined) using a typedef for a function type. The resulting member function has exactly the same type as it would have if the function declarator were provided explicitly
+
+The use of Func f in struct S is therefore equivalent to int f().
+</p>
+</details>
+
+#### 108. :skull::skull::skull:
+```
+template <typename ...Ts>
+struct X {
+  X(Ts ...args) : Var(0, args...) {}
+  int Var;
+};
+
+int main() {
+  X<> x;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is undefined
+First, let's have a look at the initialization of X::Var. Var(0, args...) is valid if there are no template arguments, since then it's just Var(0). If there however are any template arguments, they expand to an invalid initializer for int, such as Var(0, arg1, arg2). So the only valid specialization of X is the one with no arguments.
+
+X<> x in fact does just that, it instantiates the template with no arguments, which would be valid.
+
+However, [temp.res](https://timsong-cpp.github.io/cppwp/n4659/temp.res#8.2)§17.6¶8.2 says:
+
+    [if] every valid specialization of a variadic template requires an empty template parameter pack
+    [the program is ill-formed, no diagnostic required.]
+
+As we've seen, the only valid specialization requires an empty template parameter pack, so the program is ill-formed, no diagnostic required. When no diagnostic is required, the compiler is not required to diagnose the error, but execution of the program is undefined.
+
+</p>
+</details>
+
+#### 109. :skull::skull:
+```
+#include <iostream>
+
+struct X {
+    int var1 : 3;
+    int var2;
+};
+
+int main() {
+    X x;
+    std::cout << (&x.var1 < &x.var2);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+int var1 : 3; declares a bit-field, and you can not apply operator& to a bit-field. [class.bit](https://timsong-cpp.github.io/cppwp/n4659/class.bit#3)§12.2.4¶3 in the C++ standard:
+
+    The address-of operator & shall not be applied to a bit-field, so there are no pointers to bit-fields.
+</p>
+</details>
+
+#### 110. :skull:
+```
+#include <iostream>
+
+struct override {};
+
+struct Base {
+    virtual override f() = 0;
+};
+
+struct Derived : Base {
+    virtual auto f() -> override override{
+        std::cout << "1";
+        return override();
+    }
+};
+
+int main() {
+    Derived().f();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+Can you use override as a type name, or is it a reserved keyword?
+
+[lex.key](https://timsong-cpp.github.io/cppwp/n4659/lex.key)§5.11 in the standard lists reserved keywords. override is not one of those. However, [lex.name](https://timsong-cpp.github.io/cppwp/n4659/lex.name#2)§5.10¶2 says about override and final:
+
+    [override and final] have a special meaning when appearing in a certain context. [...] Unless otherwise specified, any ambiguity as to whether a given identifier has a special meaning is resolved to interpret the token as a regular identifier.
+
+[class.mem](https://timsong-cpp.github.io/cppwp/n4659/class.mem)§12.2 lists the grammar for a class declaration, where override only has a special meaning when appearing after the declarator. It's a bit too long to reproduce here, but in all cases except for the last one in the declaration of Derived::f, override is a normal identifier, used for the type override.
+
+If we replace the type name override with type, the definition of Derived::f becomes easier to read:
+
+virtual auto f() -> type override{
+    std::cout << "1";
+    return type();
+}
+
+In main, we create an object of type Derived, call f() on it, and 1 is printed.
+</p>
+</details>
+
+#### 111. :skull::skull:
+```
+#include <type_traits>
+#include <iostream>
+
+using namespace std;
+
+struct X {
+    int f() const&&{
+        return 0;
+    }
+};
+
+int main() {
+    auto ptr = &X::f;
+    cout << is_same_v<decltype(ptr), int()>
+         << is_same_v<decltype(ptr), int(X::*)()>;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 00
+[dcl.fct](https://timsong-cpp.github.io/cppwp/n4659/dcl.fct#8)§11.3.5¶8 says:
+
+    The return type, the parameter-type-list, the ref-qualifier, the cv-qualifier-seq, and the exception specification, but not the default arguments, are part of the function type.
+
+This means that the ref-qualifier (in this case const&&) is part of the type and thus the type of ptr is int(X::*)() const&&.
+</p>
+</details>
+
+#### 112. :skull::skull:
+```
+#include <iostream>
+
+struct Foo {
+  operator auto() {
+    std::cout << "A";
+    return 1;
+  }
+};
+
+int main() {
+  int a = Foo();
+  std::cout << a;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: A1
+A normal conversion function can have a deduced return type (only conversion function templates are not allowed so due to [class.conv.fct](https://timsong-cpp.github.io/cppwp/n4659/class.conv.fct#6)§15.3.2¶6):
+
+    A conversion function template shall not have a deduced return type (§10.1.7.4).
+
+And even if conversion functions don't have a return type specified in the same way as normal functions, they do have a return type: [class.conv.fct](https://timsong-cpp.github.io/cppwp/n4659/class.conv.fct#1)§15.3.2¶1:
+
+    The type of the conversion function (§11.3.5) is “function taking no parameter returning conversion-type-id”.
+
+Where conversion-type-id is the T in operator T() {...}. So we're allowed to deduce this type just like we deduce return types from normal functions.
+</p>
+</details>
+
+#### 113. :skull::skull:
+```
+#include <algorithm>
+#include <iostream>
+
+int main() {
+    int x = 10;
+    int y = 10;
+
+    const int &max = std::max(x, y);
+    const int &min = std::min(x, y);
+
+    x = 11;
+    y = 9;
+
+    std::cout << max << min;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1111
+std::min() and std::max() return references to their smallest/largest arguments, respectively. But what if they're equal?
+
+The C++17 standard says both for std::min() in [alg.min.max](https://timsong-cpp.github.io/cppwp/n4659/alg.min.max#3)§28.7.8¶3 and for std::max() in [alg.min.max](https://timsong-cpp.github.io/cppwp/n4659/alg.min.max#11)§28.7.8¶11:
+
+    Returns the first argument when the arguments are equivalent.
+
+So both the evaluation of std::max(x,y) and std::min(x,y) return x, and both references max and min are bound to x.
+
+We then set x to 11, and print max and min, which are now both 11.
+
+Some say it would be better if min() returned its first element, but max() returned its last element. Sean Parent explains his rationale for this in his BoostCon 2016 Keynote [Better Code](https://www.youtube.com/watch?v=giNtMitSdfQ&t=1448s).
+</p>
+</details>
+
+#### 114. :skull::skull::skull:
+```
+#include <iostream>
+
+using namespace std;
+
+int main() {
+    int a = '0';
+    char const &b = a;
+    cout << b;
+    a++;
+    cout << b;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 00
+'0' is a character literal, with type char. (The value of '0' is actually implementation defined, but will typically be 48.) This value is then promoted to an int, and stored in a.
+
+We then take a reference b to a. But b is a char reference, not an int reference, which means they are not reference related. [dcl.init.ref](https://timsong-cpp.github.io/cppwp/n4659/dcl.init.ref#4)§11.6.3¶4:
+
+    Given types “cv1 T1” and “cv2 T2”, “cv1 T1” is reference-related to “cv2 T2” if T1 is the same type as T2, or T1 is a base class of T2.
+
+"cv1 T1" here being char const, and "cv2 T2" being int , so they're not related. Since they're not, [dcl.init.ref](https://timsong-cpp.github.io/cppwp/n4659/dcl.init.ref#5.2.2.2)§11.6.3¶5.2.2.2 applies:
+
+    Otherwise, the initializer expression is implicitly converted to a prvalue of type “cv1 T1”. The temporary materialization conversion is applied and the reference is bound to the result.
+
+So the initializer expression a is converted to a temporary char const, which b refers to.
+
+We then print b, which refers to our temporary char with the value '0'.
+
+We then increment the original a, which importantly does not modify the temporary that b refers to.
+
+We finally print b again, which still has the value '0'.
+</p>
+</details>
+
+#### 115. :skull::skull::skull:
+```
+#include<iostream>
+
+template<typename T>
+void foo(T...) {std::cout << 'A';}
+
+template<typename... T>
+void foo(T...) {std::cout << 'B';}
+
+int main(){  
+   foo(1); 
+   foo(1,2);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: AB
+The first foo (let's call it foo₁) is a template for an old-school (pre variadic templates) variadic function. It takes a first argument of type T, followed by a varying number of arguments.
+
+The second foo (let's call it foo₂) is a variadic function template (notice the ellipsis in typename...). It takes a parameter pack.
+
+Which overload is selected for each of the calls too foo?
+
+When a function is overloaded, we first need to find which of the functions are viable for a given function call. Then, we need to find out which of those viable functions is the best one. For function templates, we first perform template argument deduction to generate candidate specializations.
+foo(1):
+
+First let's look at the call foo(1). The explanation is lengthy, but rest assured we re-use most of it in the much shorter explanation of foo(1,2)!
+
+We start by deducing the template arguments for both overloads. For foo₁, the argument 1 is used to deduce T to be int. It's signature is then foo₁(int, ...). However, for overload resolution we ignore the ... since it doesn't have a matching argument: [over.match.viable](https://timsong-cpp.github.io/cppwp/n4659/over.match.viable#2.3)§16.3.2¶2.3:
+
+    For the purposes of overload resolution, the parameter list is truncated on the right, so that there are exactly m parameters.
+
+So we end up with the viable function foo₁(int).
+
+For foo₂, T... is a function parameter pack. The argument 1 is used to deduce this as one int, and it's signature is foo₂(int).
+
+So, both foos are viable. Which one is best? [over.match.best](https://timsong-cpp.github.io/cppwp/n4659/over.match.best#1)§16.3.3¶1:
+
+    Given these definitions, a viable function F1 is defined to be a better function than another viable function F2 if for all arguments i, ICSi(F1) is not a worse conversion sequence than ICSi(F2), and then
+
+    for some argument j, ICSj(F1) is a better conversion sequence than ICSj(F2)
+
+ICSi(F1) just means "the Implicit Conversion Sequence for argument i. Our sole argument 1 is of type int, so no conversion sequence is needed for neither foo₁ nor foo₂, as they both take an int as their first argument. (i.e. neither is a better conversion sequence than the other.)
+
+[over.match.best](https://timsong-cpp.github.io/cppwp/n4659/over.match.best#1)§16.3.3¶1 continues:
+
+    [or, if not that] F1 and F2 are function template specializations, and the function template for F1 is more specialized than the template for F2 according to the partial ordering rules
+
+I won't go into all the details for partial ordering here, but skip to the interesting parts. In short, we transform each specialization by substituting each template parameter with a unique, made up type and get foo₁(X, ...) and foo₂(Y). Then we do deduction from each transformed function to the other, original template.
+
+Again, the ellipsis is ignored since it doesn't have an argument at the call site: [temp.deduct.partial](https://timsong-cpp.github.io/cppwp/n4659/temp.deduct.partial#3)§17.8.2.4¶3:
+
+    The types used to determine the ordering depend on the context in which the partial ordering is done:
+    In the context of a function call, the types used are those function parameter types for which the function call has arguments.
+
+We now do deduction of foo₂(T...) from foo₁(X), which deduces T=X. We then do deduction of foo₁(T) from foo₂(Y). It looks like we would get T=Y, but [temp.deduct.type](https://timsong-cpp.github.io/cppwp/n4659/temp.deduct.type#10)§17.8.2.5¶10 says:
+
+    During partial ordering, if Ai was originally a function parameter pack [and] Pi is not a function parameter pack, template argument deduction fails.
+
+Ai in this case is Y, which was originally a function parameter pack. Pi is T, which is not a function parameter pack, so deduction fails.
+
+Since we can deduce foo₂ from foo₁, but not foo₁, from foo₂, foo₁ is more specialized and a better function. Overload resolution picks it and prints A.
+foo(1,2):
+
+Now let's look at the call foo(1,2).
+
+Again we start by deducing the template arguments. For foo₁, the first argument 1 is used to deduce T to be int. It's signature is then foo₁(int, ...).
+
+For foo₂, T... is a function parameter pack. The arguments 1 and 2 are used to deduce this as two ints, and it's signature is foo₂(int, int).
+
+Which of these is the best match? We turn again to [over.match.best](https://timsong-cpp.github.io/cppwp/n4659/over.match.best#1)§16.3.3¶1 which checks whether
+
+    for some argument j, ICSj(F1) is a better conversion sequence than ICSj(F2)
+
+For both templates, the first argument is an exact match. For foo₁, the second argument 2 requires an ellipsis conversion sequence to match the second parameter ...: [over.ics.ellipsis](https://timsong-cpp.github.io/cppwp/n4659/over.ics.ellipsis#1)§16.3.3.1.3¶1:
+
+    An ellipsis conversion sequence occurs when an argument in a function call is matched with the ellipsis parameter specification of the function called
+
+For foo₂, no conversion is required, so it's a better match. The second foo is called, and B is printed.
+
+</p>
+</details>
+
+#### 116. :skull::skull:
+```
+#include <iostream>
+
+template<class T>
+void f(T) { std::cout << 1; }
+
+template<>
+void f<>(int*) { std::cout << 2; }
+
+template<class T>
+void f(T*) { std::cout << 3; }
+
+int main() {
+    int *p = nullptr; 
+    f( p );
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 3
+The name f is overloaded by the two function templates void f(T) and void f(T*). Note that overload resolution only considers the function templates, not the explicit specialisation void f<>(int*)! For overload resolution, first we deduce the template arguments for each function template, and get T = int * for the first one, and T = int for the second.
+
+Both function templates are viable, but which one is best? According to [over.match.best](https://timsong-cpp.github.io/cppwp/n4659/over.match.best#1)§16.3.3¶1, a function template is a better match than another function template if it's more specialised:
+
+    a viable function F1 is defined to be a better function than another viable function F2 if (...) the function template for F1 is more specialized than the template for F2 according to the partial ordering rules described in 17.5.6.2
+
+The process of partial ordering is a bit long to quote here, and not key to this question. But in summary, anything accepted by f(T*) would also be accepted by f(T), but not the other way around. So f(T*) is more specialised.
+
+Now we know that the function template void f(T*) is selected by overload resolution, and we can start thinking about specialisations. Which of the function templates is void f<>(int*) a specialisation of? [temp.expl.spec](https://timsong-cpp.github.io/cppwp/n4659/temp.expl.spec#3)§17.7.3¶3:
+
+    A declaration of a function template (...) being explicitly specialized shall precede the declaration of the explicit specialization.
+
+So the explicit specialisation void f<>(int*) is a specialisation of void f(T), since that's the only function template declaration that precedes it. Overload resolution however selected the other function template, void f(T*), and we instead call an implicitly instantiated a specialisation of that, printing 3.
+
+Note: This example is taken from [Why Not Specialize Function Templates?](http://www.gotw.ca/publications/mill17.htm) by Herb Sutter.
+</p>
+</details>
+
+#### 117. :skull::skull:
+```
+#include <iostream>
+#include <type_traits>
+
+int main() {
+    std::cout << std::is_same_v<
+        void(int),
+        void(const int)>;
+
+    std::cout << std::is_same_v<
+        void(int*),
+        void(const int*)>;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 10
+The constness of parameters are not part of the function type.
+
+[dcl.fct](https://timsong-cpp.github.io/cppwp/n4659/dcl.fct#5)§11.3.5¶5 in the standard:
+
+    The type of a function is determined using the following rules. The type of each parameter (including function parameter packs) is determined from its own decl-specifier-seq and declarator. (...) After producing the list of parameter types, any top-level cv-qualifiers modifying a parameter type are deleted when forming the function type.
+
+So in the first case, the type of void(const int) is actually void(int). The types are the same, and 1 is printed.
+
+What about the second case? Here the parameter types are "pointer to int" and "pointer to const int", respectively. The pointers themselves are not const, so there's no const to remove. The types of the functions are different, and 0 is printed.
+
+Why is is the constness of parameters not part of the function type? When an argument is passed by value, a copy is made, and the original argument is never modified anyway. So whether the parameter is const or not does not matter to the caller, it's only relevant inside the function.
+</p>
+</details>
+
+#### 118. :skull:
+```
+#include <iostream>
+#include <sstream>
+
+int main() {
+  std::stringstream ss("a");
+  std::cout << ss.str();
+  ss << "b";
+  std::cout << ss.str();
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: ab
+stringstream is backed by a character buffer. Initializing it with a string initializes the buffer with that string, in this case a. Calling str() returns the contents of the buffer, and we print a.
+
+operator<< writes to the next position in the buffer, in this case the beginning of the buffer, overwriting whatever is already there. A b is written, overwriting the a which was previously in the buffer.
+
+Finally str() is called again, this time printing b.
+
+We can change this behaviour by initializing stringstream like this:
+
+std::stringstream ss("a", std::ios_base::out|std::ios_base::ate);
+
+Then the a doesn't get overwritten, and the program instead outputs aab, where a comes from the first call to str(), and ab comes from the second call to str().
+Detail
+
+A stringstream is an alias for basic_stringstream<char>. basic_stringstream<char> uses a basic_stringbuf<char> as storage for the characters in the stream:
+
+using stringstream = basic_stringstream<char>
+
+ ------------------         ---------------
+|basic_stringstream|<>-----|basic_stringbuf|
+ ------------------         ---------------
+
+Let's have a look at the basic_stringstream constructor: §30.8.5.2¶2:
+
+    explicit basic_stringstream(const basic_string<charT, traits, Allocator>& str, ios_base::openmode which = ios_base::out | ios_base::in);
+    Effects: Constructs an object of class basic_stringstream<charT, traits>, initializing the base class with basic_iostream(&sb) and initializing sb with basic_stringbuf<charT, traits, Alloca-
+    tor>(str, which).
+
+sb here refers to the basic_stringbuf which backs the basic_stringstream. So this constructor initializes the buffer with "a", and sets its mode to ios_base::out | ios_base::in.
+
+Then we call str() on the basic_stringstream, which again calls str() on the basic_stringbuf, which according to 30.8.2.3¶1:
+
+    Returns: A basic_string object whose content is equal to the basic_stringbuf underlying character sequence.
+
+So we get out a copy of that, and a is printed. (Note that str() does not modify the buffer.)
+
+Then we stream "b" into the basic_stringstream. This operation is defined in terms of some of the basic_stringstream base classes, so here's (parts of) its inheritance diagram, for reference:
+
+           --------- 
+          |basic_ios|
+           --------- 
+          /         \
+ -------------   -------------
+|basic_istream| |basic_ostream|
+ -------------   -------------
+          \         /
+         -------------- 
+        |basic_iostream|
+         -------------- 
+               |
+        ------------------ 
+       |basic_stringstream|
+        ------------------
+
+basic_stringstream inherits operator<< from ostream. which according to §30.7.5.1¶2:
+
+    generate[s] (or insert[s]) output characters by actions equivalent to calling rdbuf()->sputc(int_type).
+
+rdbuf() here refers to our basic_stringbuf. basic_stringbuf inherits sputc from basic_streambuf. §30.6.3.2.5¶1:
+
+    int_type sputc(char_type c);
+    (...) stores c at the next pointer for the output sequence, increments the pointer
+
+So when we stream into our stringstream, the characters get stored at the next pointer in the buffer, and the next pointer is incremented.
+
+Since the basic_stringbuf was constructed with ios_base::out | ios_base::in, the next pointer points to the beginning of the stream, and the a already in the stream gets overwritten. If we add the flag io_base::ate, we get a different result, [ios::openmode]§30.5.3.1.4:
+
+    ate open and seek to end immediately after opening
+
+This will seek to the end of the stream, i.e. after the a which is already in the buffer, and the b will be appended rather than overwriting the a. So if we construct the stringstream like this:
+
+std::stringstream ss("a", std::ios_base::out|std::ios_base::ate);
+
+The output changes to aab, where a comes from the first call to str(), and ab comes from the second call to str().
+</p>
+</details>
+
+#### 119. :skull::skull:
+```
+#include <iostream>
+
+struct C {
+    C() = default;
+    int i;
+};
+
+int main() {
+    const C c;
+    std::cout << c.i;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+We're trying to default-initialize c. This is not allowed since it is const and C has a defaulted (not user-provided) constructor.
+
+[dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#7)§11.6¶7:
+
+    If a program calls for the default-initialization of an object of a const-qualified type T, T shall be a const-default-constructible class type or array thereof.
+
+Is C const-default-constructible?
+
+[dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#7)§11.6¶7 again:
+
+    A class type T is const-default-constructible if default-initialization of T would invoke a user-provided constructor of T (not inherited from a base class) or if
+    - each direct non-variant non-static data member M of T has a default member initializer or, if M is of class type X (or array thereof), X is const-default-constructible,
+    - if T is a union with at least one non-static data member, exactly one variant member has a default member initializer,
+    - if T is not a union, for each anonymous union member with at least one non-static data member (if any), exactly one non-static data member has a default member initializer, and
+    - each potentially constructed base class of T is const-default-constructible.
+
+C does not have a user-provided constructor, and the points below don't apply either.
+
+There are several ways we could make C const-default-constructible:
+- Give int i a default member initializer: int i{0}.
+- Remove = default from the constructor, and instead do C::C() = default; separately outside the class definition. This constructor now counts as user-provided.
+- Manually provide a constructor: C() {}
+</p>
+</details>
+
+#### 120. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
@@ -3413,3 +4209,129 @@ m.emplace(7, C(1));
 #### 
 </p>
 </details>
+
+#### 121. :skull:
+```
+#include <iostream>
+
+void f(char*&&) { std::cout << 1; }
+void f(char*&) { std::cout << 2; }
+
+int main() {
+   char c = 'a';
+   f(&c);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+c is an lvalue char. &c returns a pointer to the lvalue c, but that pointer itself is an rvalue, since it's just a nameless temporary returned from operator&.
+
+The first overload of f takes an rvalue reference to char *, the second takes an lvalue reference to char*. Since the pointer is an rvalue, the first overload is selected, and 1 is printed.
+</p>
+</details>
+
+#### 122. :skull::skull:
+```
+#include <iostream>
+
+struct A {
+    A() { std::cout << "A"; }
+    ~A() { std::cout << "a"; }
+};
+
+int main() {
+    std::cout << "main";
+    return sizeof new A;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: main
+First, the program unsurprisingly prints main. But what happens on the next line?
+
+[expr.sizeof](https://timsong-cpp.github.io/cppwp/n4659/expr.sizeof#1)§8.3.3¶1 in the standard:
+
+    The sizeof operator yields the number of bytes in the object representation of its operand. The operand is either an expression, which is an unevaluated operand (Clause 8) or a parenthesized type-id. 
+
+The most common form of sizeof is probably the latter, sizeof(type-id) (e.g. sizeof(int)). But there's also the sizeof expression form (e.g. sizeof new A) which is used in this question.
+
+The operand here is the expression new A. The type of that expression is "pointer to A". The size of a pointer varies between platforms, but that doesn't really matter in this question since we never print it. The question is whether new A constructs a new A, and if so, whether it gets destructed.
+
+The quote above says that the expression is "an unevaluated operand", but what does that mean?
+
+[expr](https://timsong-cpp.github.io/cppwp/n4659/expr#8)§8¶8:
+
+    In some contexts, unevaluated operands appear (8.2.8, 8.3.3, 8.3.7, 10.1.7.2). An unevaluated operand is not evaluated. 
+
+So the expression new A is not evaluated, and A is never constructed. The expression is only used for sizeof.
+
+(And since there is no delete, A is never destructed either.)
+</p>
+</details>
+
+#### 123. :skull::skull:
+```
+#include <iostream>
+
+class show_id
+{
+public:
+    ~show_id() { std::cout << id; }
+    int id;
+};
+
+int main()
+{
+    delete[] new show_id[3]{ {0}, {1}, {2} };
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 210
+The core of the question is "in what order are the objects destroyed?". In C++, objects are generally destroyed in the reverse order that they were constructed. delete[] is no exception.
+
+[expr.delete](https://timsong-cpp.github.io/cppwp/n4659/expr.delete#6)§7.6.2.8¶6:
+
+    In the case of an array, the elements will be destroyed in order of decreasing address (that is, in reverse order of the completion of their constructor (...).
+
+So the objects are destroyed in the order 2, 1, 0, and 210 is printed.
+</p>
+</details>
+
+#### 124. :skull::skull:
+```
+#include <iostream>
+#include <string>
+
+auto main() -> int {
+  std::string out{"Hello world"};
+  std::cout << (out[out.size()] == '\0');
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+Perhaps surprisingly, this program has no undefined behaviour. std::string's operator[](size_type pos) must return a reference to the null character when pos equals the length of the string:
+
+[string.access](https://timsong-cpp.github.io/cppwp/n4659/string.access#1)§24.3.2.5¶1:
+
+    operator[](size_type pos)
+    Returns: *(begin() + pos) if pos < size(). Otherwise, returns a reference to an object of type charT with value charT(), where modifying the object to any value other than charT() leads to undefined behavior.
+
+charT() is char() in this case. The char() expression value-initializes a char, which initializes it to 0.
+
+So out[out.size()] == '\0' compares 0 to \0. Are they the same? Yes:
+
+[lex.charset](https://timsong-cpp.github.io/cppwp/n4659/lex.charset#3)§5.3¶3:
+
+    The basic execution character set and the basic execution wide-character set shall each contain all the members of the basic source character set, plus control characters representing alert, backspace, and carriage return, plus a null character (respectively, null wide character), whose value is 0
+
+So the value of \0 is indeed 0. The comparison is true, and 1 is printed.
+</p>
+</details>
+
