@@ -2585,117 +2585,826 @@ So B::foo() is called, but with the default argument from A::foo(), and the outp
 </p>
 </details>
 
-#### 80. :skull:
+#### 80. :skull::skull::skull:
 ```
+#include <iostream>
+
+int main() {
+    int n = 3;
+    int i = 0;
+
+    switch (n % 2) {
+    case 0: 
+    do {
+    ++i;
+    case 1: ++i;
+    } while (--n > 0);
+    }
+
+    std::cout << i;
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+### The program is guaranteed to output: 5
+Though this piece of code might look strange at first sight, it is still valid C++ code and is known as [Duff's device](https://en.wikipedia.org/wiki/Duff%27s_device).
+
+According to the standard [stmt.select](https://timsong-cpp.github.io/cppwp/n4659/stmt.select#1)§9.4¶1, a switch statement can be followed (likewise, e.g., an if statement) by any valid statement including a compound (block) statement. The only difference from a general compound statement is that case and default labels can appear inside it. Jumping into the nested do-while block is legal ([stmt.dcl](https://timsong-cpp.github.io/cppwp/n4659/stmt.dcl#3)§9.7¶3), and its execution is not altered by the case labels ([stmt.switch](https://timsong-cpp.github.io/cppwp/n4659/stmt.switch#6)§9.4.2¶6).
 </p>
 </details>
 
-#### 81. :skull:
+#### 81. :skull::skull:
 ```
+#include <iostream>
+
+void f()
+{
+    std::cout << "1";
+}
+
+template<typename T>
+struct B
+{
+    void f()
+    {
+        std::cout << "2";
+    }
+};
+
+template<typename T>
+struct D : B<T>
+{
+    void g()
+    {
+        f();
+    }
+};
+
+int main()
+{
+    D<int> d;
+    d.g();
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 1
+According to the standard, [temp.dep](https://timsong-cpp.github.io/cppwp/n4659/temp.dep#3)§17.6.2¶3, "in the definition of a class or class template, if a base class depends on a template-parameter, the base class scope is not examined during unqualified name lookup either at the point of definition of the class template or member or during an instantiation of the class template or member". So when the compiler sees a call to a function f() inside g() it should choose the one from the global scope, and the program should output "1". See discussions in [the C++ FAQ](https://isocpp.org/wiki/faq/templates#nondependent-name-lookup-members) and on [Stack Overflow](https://stackoverflow.com/questions/4643074/why-do-i-have-to-access-template-base-class-members-through-the-this-pointer).
+
+In the real life, not all compilers obey this section of the standard, and some of them produce (erroneously) the code that outputs "2". For example, GCC 4.9.3 - "1", Clang 3.8.1 - "1", Microsoft C++ 19.00.24210 - "2", Intel C++ 15.0.7.287 (On Windows) - "2". Even if the implementation you use calls B::f() for the unqualified f(), you should not rely on this behaviour.
 </p>
 </details>
 
 #### 82. :skull:
 ```
+#include <iostream>
+
+class A {
+  int foo = 0;
+
+public:
+  int& getFoo() { return foo; }
+  void printFoo() { std::cout << foo; }
+};
+
+int main() {
+  A a;
+
+  auto bar = a.getFoo();
+  ++bar;
+
+  a.printFoo();
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 0
+To get to the bottom of this, we need to take a detour via function templates.
+
+According to [dcl.spec.auto](https://timsong-cpp.github.io/cppwp/n4659/dcl.spec.auto#6)§10.1.7.4¶6 (auto specifier) in the standard:
+"The type of each declared variable is determined by placeholder type deduction (§10.1.7.4.1)."
+
+Placeholder type deduction works as per [dcl.type.auto.deduct](https://timsong-cpp.github.io/cppwp/n4659/dcl.type.auto.deduct#4)§10.1.7.4.1¶4 :
+
+    If the placeholder is the auto type-specifier, the deduced type T' replacing T is determined using the rules for template argument deduction. (...) Deduce a value for U [the template parameter for the invented function] using the rules of template argument deduction from a function call (§17.8.2.1) (...).
+
+So the rules for auto bar = a.getFoo(); are the same as if we did
+
+template<typename T> void f(T t);
+f(a.getFoo());
+
+Let's have a look at [temp.deduct.call](https://timsong-cpp.github.io/cppwp/n4659/temp.deduct.call#4)§17.8.2.1¶4:
+"In general, the deduction process attempts to find template argument values that will make the deduced A identical to A" (where A is the type of the argument of the call.)
+
+Now what is the type of the argument of the call? getFoo() returns int&, but let's see what [expr](https://timsong-cpp.github.io/cppwp/n4659/expr#5)§5¶5 has to say about the type of expressions:
+"If an expression initially has the type “reference to T”, the type is adjusted to T prior to any further analysis."
+
+So the type of the expression a.getFoo() that is used for deduction is int, not int&. Now int is being used for deducing T in our imaginary void f(T t), so T is int. Since auto uses the same rule, the type of bar is also int.
+
+Since bar is not a reference, incrementing it does not increment foo, and the output of the program is 0.
 </p>
 </details>
 
 #### 83. :skull:
 ```
+#include<iostream>
+
+void f(int& a, const int& b) {
+  std::cout << b;
+  a = 1;
+  std::cout << b;
+}
+
+int main(){
+  int x = 0;
+  f(x,x);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 01
+Both a and b refer to the same variable x.
+
+The fact that b is a const reference does not guarantee that b isn't modified from elsewhere, only that we can't modify it.
 </p>
 </details>
 
-#### 84. :skull:
+#### 84. :skull::skull:
 ```
+#include <limits>
+#include <iostream>
+
+int main() {
+    std::cout << std::numeric_limits<unsigned char>::digits;
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is unspecified / implementation defined 
+Although this program probably outputs 8 on your computer, it's not guaranteed to do so by the standard. All we can be sure of is what's specified in [basic.fundamental](https://timsong-cpp.github.io/cppwp/n4659/basic.fundamental#1)§6.9.1¶1:
+
+"Objects declared as characters (char) shall be large enough to store any member of the implementation’s basic character set. (...) A char, a signed char, and an unsigned char occupy the same amount of storage."
+
+So unsigned char is the same size as char, which is large enough to store any member of the implementation’s basic character set - but not necessarily 8.
 </p>
 </details>
 
-#### 85. :skull:
+#### 85. :skull::skull:
 ```
+#include <iostream>
+
+struct Base {
+  void f(int) { std::cout << "i"; }
+};
+
+struct Derived : Base {
+  void f(double) { std::cout << "d"; }
+};
+
+int main() {
+  Derived d;
+  int i = 0;
+  d.f(i);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: d
+Why does overload resolution not pick the obviously better void f(int), but instead void f(double) which requires a floating-integral conversion from int to double?
+
+It turns out that void f(int) isn't even in scope, and is not considered for overload resolution at all. When the name f is introduced in Derived, it hides the name f that was introduced in Base.
+
+[basic.scope](https://timsong-cpp.github.io/cppwp/n4659/basic.scope)§6.3 in the C++ standard is dedicated to scope. [basic.scope.hiding](https://timsong-cpp.github.io/cppwp/n4659/basic.scope.hiding#1)§6.3.10¶1 and ¶3 has some hints about what's going on in our case:
+
+¶1: "A name can be hidden by an explicit declaration of that same name in a nested declarative region or derived class (§13.2)"
+¶3: "The declaration of a member in a derived class (Clause 13) hides the declaration of a member of a base class of the same name; see §13.2"
+
+Both of these refer to [class.member.lookup](https://timsong-cpp.github.io/cppwp/n4659/class.member.lookup)§13.2, so let's explore the details about how the name f is looked up in a class scope C:
+
+[class.member.lookup](https://timsong-cpp.github.io/cppwp/n4659/class.member.lookup#4)§13.2¶4:
+"If C contains a declaration of the name f, the declaration set contains every declaration of f declared in C that satisfies the requirements of the language construct in which the lookup occurs.(...) If the resulting declaration set is not empty, the subobject set contains C itself, and calculation is complete."
+
+So when looking for a declaration of f and finding Derived::f, the calculation is complete, and Base is not examined at all. If no f was found in Derived, we would continue with [class.member.lookup](https://timsong-cpp.github.io/cppwp/n4659/class.member.lookup#5)§13.2¶5:
+
+"Otherwise (i.e., C does not contain a declaration of f or the resulting declaration set is empty), S(f,C) is initially empty. If C has base classes, calculate the lookup set for f in each direct base class subobject Bi, and merge each such lookup set S(f, Bi) in turn into S(f, C).
+
+But since Derived does indeed contain a declaration of f, we never get around to looking at Base.
 </p>
 </details>
 
-#### 86. :skull:
+#### 86. :skull::skull:
 ```
+#include <iostream>
+
+template <typename T> void f() {
+  static int stat = 0;
+  std::cout << stat++;
+}
+
+int main() {
+  f<int>();
+  f<int>();
+  f<const int>();
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 010
+The functions called by f<int>() and f<const int>() actually have the same function type, but they are still distinct functions, so each get their own distinct static int stat.
+
+When we call f<int>() for the first time, stat is 0, and 0 is printed. stat is then incremented to 1.
+When we call f<int>() again, stat is 1, and 1 is printed. stat is then incremented to 2.
+We then call f<const int>(), which is a distinct function with its own stat, which is 0, and 0 is printed.
+
+This example from [temp.deduct](https://timsong-cpp.github.io/cppwp/n4659/temp.deduct#3)§17.8.2¶3 in the standard is is relevant:
+
+template <class T> void f(T t);
+(...)
+// #1: function type is f(int), t is non const
+f<int>(1);
+// #2: function type is f(int), t is const
+f<const int>(1);
+
+So we can see that all calls to f() in the question are to a function of the same type f(int). However, [temp.deduct](https://timsong-cpp.github.io/cppwp/n4659/temp.deduct#4)§17.8.2¶4 says:
+"f<int>(1) and f<const int>(1) call distinct functions even though both of the functions called have the same function type."
+
+So now we know that the functions are distinct. And [temp.fct.spec](https://timsong-cpp.github.io/cppwp/n4659/temp.fct.spec#2)§17.8¶2 says:
+"Each function template specialization instantiated from a template has its own copy of any static variable."
+
+So now we know that the stat variables will also be distinct.
 </p>
 </details>
 
-#### 87. :skull:
-```
+#### 87. :skull::skull:
+```   
+#include <iostream>
+#include <typeinfo>
+
+void takes_pointer(int* pointer) {
+  if (typeid(pointer) == typeid(int[])) std::cout << 'a';
+  if (typeid(pointer) == typeid(int*)) std::cout << 'p';
+}
+
+void takes_array(int array[]) {
+  if (typeid(array) == typeid(int[])) std::cout << 'a';
+  if (typeid(array) == typeid(int*)) std::cout << 'p';
+}
+
+int main() {
+  int* pointer = nullptr;
+  int array[1];
+
+  takes_pointer(array);
+  takes_array(pointer);
+
+  std::cout << (typeid(int*) == typeid(int[]));
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: pp0
+Functions taking pointers can also be called with arrays, and vice versa. So are arrays and pointers the same? No.
+
+If they aren't the same, why can both functions be called with both arguments?
+
+First let's look at takes_pointer(array);. What happens here is usually referred to as the array "decaying" to a pointer. To be a bit more precise, let's have a look at [conv.array](https://timsong-cpp.github.io/cppwp/n4659/conv.array)§7.2 in the C++ standard:
+
+"An lvalue or rvalue of type “array of N T” or “array of unknown bound of T” can be converted to a prvalue of type “pointer to T”."
+
+array is of type "array of 1 int", which converts to a prvalue (temporary) of type "pointer to int".
+
+So what happens with takes_array(pointer);, does the pointer convert to an array? No, it's actually the other way around. Let's look at [dcl.fct](https://timsong-cpp.github.io/cppwp/n4659/dcl.fct#5)§11.3.5¶5 about function parameters:
+
+"After determining the type of each parameter, any parameter of type “array of T” (...) is adjusted to be “pointer to T”".
+
+So in void takes_array(int array[]), the type of array is adjusted to be pointer to int.
 </p>
 </details>
 
 #### 88. :skull:
 ```
+#include <iostream>
+
+struct C {
+  C() { std::cout << "1"; }
+  C(const C& other) { std::cout << "2"; }
+  C& operator=(const C& other) { std::cout << "3"; return *this;}
+};
+
+int main() {
+  C c1;
+  C c2 = c1;
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 12
+On the first line, C c1;, the object c1 is default initialized, so the default constructor is called, printing 1.
+
+On the second line, C c2 = c1;, the object c2 is copy initialized, so the copy constructor is called, printing 2. (Note that no assignment is taking place, even though there's a = involved.)
+
+Let's have a look at the C++ standard:
+
+[dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#15)§11.6¶15:
+"The initialization that occurs in the form of a brace-or-equal-initializer (...) is called copy-initialization."
+
+The initialization of C c2 = c1; is the "equal" part of a braced-or-equal-initializer, so we have copy-initialization.
+
+[dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#16)§11.6¶16:
+"If the destination type is a (possibly cv-qualified) class type (...) If the initialization is direct-initialization, or if it is copy-initialization where the cv-unqualified version of the source type is the same class as, or a derived class of, the class of the destination, constructors are considered. The applicable constructors are enumerated (§16.3.1.3), and the best one is chosen through overload resolution (§16.3). The constructor so selected is called to initialize the object, with the initializer expression or expression-list as its argument(s)."
+
+The destination type here is C, and the initialization is copy-initialization. The source type is the same class as the class of the destination, so constructors are considered. The only constructor taking a C as an argument is our copy constructor, which prints 2.  
 </p>
 </details>
 
-#### 89. :skull:
+#### 89. :skull::skull:
 ```
+#include <iostream>
+
+int main() {
+  char* a = const_cast<char*>("Hello");
+  a[4] = '\0';
+  std::cout << a;
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is undefined 
+Modifying string literals is undefined behavior. In practice, the implementation can for instance store the string literal in read-only memory, such as the code segment. Two string literals might even be stored in overlapping memory. So allowing them to be modified is clearly not a good idea.
+
+Let's look at [lex.literal](https://timsong-cpp.github.io/cppwp/n4659/lex.literal)§5.13 in the C++ standard:
+
+According to [lex.string](https://timsong-cpp.github.io/cppwp/n4659/lex.string#1)§5.13.5¶1 "Hello" is a string literal:
+
+"A string literal is a sequence of characters (as defined in §5.13.3) surrounded by double quotes, optionally
+prefixed by R, u8, u8R, u, uR, U, UR, L, or LR, as in "...", R"(...)", u8"...", u8R"(...)", u"...",
+uR"˜(...)˜", U"...", UR"zzz(...)zzz", L"...", or LR"(...)", respectively."
+
+The particularity of storing of string literals is unspecified. Thus the result of modification of a string literal is undefined [1]:
+
+[lex.string](https://timsong-cpp.github.io/cppwp/n4659/lex.string#16)§5.13.5¶16:
+
+"Whether all string literals are distinct (that is, are stored in nonoverlapping objects) and (...) is unspecified. [Note: The effect of attempting to modify a string literal is undefined. - end note]"
+
+[1]: Also consider that the type of the string literal is array of const char, and thus not modifiable.
 </p>
 </details>
 
-#### 90. :skull:
+#### 90. :skull::skull:
 ```
+#include <iostream>
+
+struct A {
+  virtual int fn(int i = 5) const { return i + 1; }
+};
+
+struct B : A {
+  virtual int fn(int i = 7) const override { return i + 2; }
+};
+
+
+void run(const A& a) {
+  std::cout << a.fn(1) << a.fn();
+}
+
+int main() {
+  run(B());
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 37
+In both calls A::fn is overridden, so B::fn will be called. The first call a.fn(1) is trivial, the argument 1 is used, and 3 is printed.
+
+The second call a.fn() is less trivial. The implementation doesn't care about the "virtuality" of a function when determining the default argument, but instead uses the static type of the the referenced object. Thus, the default argument 5 from A::fn will be used even if B::fn is called, and 7 is printed.
+
+[dcl.fct.default](https://timsong-cpp.github.io/cppwp/n4659/dcl.fct.default#10)§11.3.6¶10 in the C++ standard:
+
+"A virtual function call (§13.3) uses the default arguments in the declaration of the virtual function determined by the static type of the pointer or reference denoting the object. An overriding function in a derived class does not acquire default arguments from the function it overrides."
 </p>
 </details>
 
-#### 91. :skull:
+#### 91. :skull::skull:
+```
+#include <iostream>
+
+struct A {
+  A(int i) : m_i(i) {}
+  operator bool() const { return m_i > 0; }
+  int m_i;
+};
+
+int main() {
+  A a1(1), a2(2);
+  std::cout << a1 + a2 << (a1 == a2);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 21
+For both a1 + a2 and a1 == a2, the built-in operators operator+ and operator== for int is used. The two objects a1 and a2 are implicitly converted first to bool and then to int before calling the operator. In both cases, they convert first to true, then to 1.
+
+1 + 1 equals 2, and 1 == 1 is true, so 21 is printed.
+Detailed explanation:
+
+We'll go through the full reasoning for operator+ first:
+
+struct A does not overload operator+, so we need to use a built-in operator+. Can we somehow convert a1 and a2 to a type compatible with operator+?
+
+[conv](https://timsong-cpp.github.io/cppwp/n4659/conv#2)§4¶2:
+
+    expressions with a given type will be implicitly converted to other types in several contexts:
+    — When used as operands of operators
+    (...)
+
+So we are allowed to use an implicit conversion sequence to convert a1 and a2 into something we can use with a built in operator+. The specific type of implicit conversion sequence we need in this case is a user-defined conversion sequence, which is defined in [over.ics.user](https://timsong-cpp.github.io/cppwp/n4659/over.ics.user#1)§13.3.3.1.2¶1:
+
+    A user-defined conversion sequence consists of an initial standard conversion sequence followed by a user-defined conversion (12.3) followed by a second standard conversion sequence.
+
+As a first try, can we use the user-defined conversion to bool (our operator bool() const) and then use an operator+ for bool? [over.built](https://timsong-cpp.github.io/cppwp/n4659/over.built#9)§16.6¶9:
+
+    For every promoted arithmetic type T , there exist candidate operator functions of the form
+    T operator+(T);
+
+And what's a promoted arithmetic type? [over.built](https://timsong-cpp.github.io/cppwp/n4659/over.built#2)§16.6¶2:
+
+    the term promoted integral type is used to refer to those integral types which are preserved by integral promotion [...]. Similarly, the term promoted arithmetic type refers to floating types plus promoted integral types.
+
+So is bool a promoted arithmetic type? It's certainly not a floating type, but is it a promoted integral type? No, [conv.prom](https://timsong-cpp.github.io/cppwp/n4659/conv.prom#6)§7.6¶6:
+
+    A prvalue of type bool can be converted to a prvalue of type int, with false becoming zero and true becoming one.
+
+So operator+ does not exist for bool, and we have to continue with our implicit conversion sequence. After the user-defined conversion from A to bool, we can use a standard conversion sequence, in particular the integral promotion we just discussed, converting true to 1. We then call operator+ for int, with the operands 1 and 1, resulting in 2.
+
+For operator==, the story is exactly the same, as [over.built](https://timsong-cpp.github.io/cppwp/n4659/over.built#13)§16.6¶13 says:
+
+    For every pair of promoted arithmetic types L and R , there exist candidate operator functions of the form (...)
+    bool operator==(L, R);
+
+So we use the same conversion sequence from A to bool to int, ending up comparing 1 to 1, which results in true.
+</p>
+</details>
+
+#### 92. :skull::skull:
+```
+#include<iostream>
+
+namespace A{
+  extern "C" int x;
+};
+
+namespace B{
+  extern "C" int x;
+};
+
+int A::x = 0;
+
+int main(){
+  std::cout << B::x;
+  A::x=1;
+  std::cout << B::x;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 01
+Due to the extern "C" specifications, A::x and B::x actually refer to the same variable.
+
+x is first initialized to 0, then main() starts, 0 is printed, x is incremented to 1, and finally 1 is printed.
+
+[dcl.link](https://timsong-cpp.github.io/cppwp/n4659/dcl.link#6)§10.5¶6 in the C++ standard:
+"Two declarations for a variable with C language linkage with the same name (ignoring the namespace names that qualify it) that appear in different namespace scopes refer to the same variable."
+</p>
+</details>
+
+#### 93. :skull::skull:
+```
+#include <vector>
+#include <iostream>
+
+std::vector<int> v;
+
+int f1() {
+  v.push_back(1);
+  return 0;
+}
+
+int f2() {
+  v.push_back(2);
+  return 0;
+}
+
+void g(int, int) {}
+
+void h() {
+ g(f1(), f2()); 
+}
+
+int main() {
+  h();
+  h();
+  std::cout << (v[0] == v[2]);
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is unspecified / implementation defined 
+The evaluation order of function argument expressions is unspecified, all we know is that they will all happen before ("be sequenced before") the contents of the called function.
+
+In particular, in the expression g(f1(), f2()), we don't know whether f1 or f2 will be sequenced first, we only know that they will both be sequenced before the body of g.
+
+Also: There isn't even a requirement on the implementation that f1 and f2 gets evaluated in the same order each time. So after calling h twice, v can contain 1212, 2121, 1221 or 2112.
+
+[expr.call](https://timsong-cpp.github.io/cppwp/n4659/expr.call#5)§8.2.2¶5: in the C++ standard:
+
+"The initialization of a parameter, including every associated value computation and side effect, is indeterminately sequenced with respect to that of any other parameter."
+
+And the helpful note in intro.executation§4.6¶17:
+
+"In an expression that is evaluated more than once during the execution of a program, unsequenced and indeterminately sequenced evaluations of its subexpressions need not be performed consistently in different evaluations."
+</p>
+</details>
+
+#### 94. :skull::skull::skull:
+```
+#include <iostream>
+
+int main() {
+    int a[] = <%1%>;
+    std::cout << a<:0:>;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+C++ provides alternative tokens for some punctuators. The two weird lines are exactly equivalent to
+
+int a[] = {1};
+std::cout << a[0];
+
+[lex.digraph](https://timsong-cpp.github.io/cppwp/n4659/lex.digraph#1)§5.5¶1-2 in the C++ standard explains this:
+
+"Alternative token representations are provided for some operators and punctuators."
+
+"In all respects of the language, each alternative token behaves the same, respectively, as its primary token, except for its spelling."
+
+Then, a table of alternative tokens is provided, which includes
+- <% and %> for { and }
+- <: and :> for [ and ]
+</p>
+</details>
+
+#### 95. :skull::skull:
+```
+#include <iostream>
+#include <cstddef>
+#include <type_traits>
+
+int main() {
+  std::cout << std::is_pointer_v<decltype(nullptr)>;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 0
+nullptr is a prvalue of type std::nullptr_t, which is not actually a pointer type. Instead, nullptr is a "null pointer constant" which can be converted to a pointer.
+
+[lex.nullptr](https://timsong-cpp.github.io/cppwp/n4659/lex.nullptr#1)§5.13.7¶1 in the C++ standard:
+
+    The pointer literal is the keyword nullptr. It is a prvalue of type std​::​nullptr_­t. [ Note: std​::​nullptr_­t is a distinct type that is neither a pointer type nor a pointer to member type; rather, a prvalue of this type is a null pointer constant and can be converted to a null pointer value or null member pointer value. See [conv.ptr] and [conv.mem].  — end note ]
+</p>
+</details>
+
+#### 96. :skull::skull:
+```
+#include <iostream>
+
+namespace x {
+  class C {};
+  void f(const C& i) {
+    std::cout << "1";
+  }
+}
+
+namespace y {
+  void f(const x::C& i) {
+    std::cout << "2";
+  }
+}
+
+int main() {
+  f(x::C());
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+Since the functions f are declared inside namespaces, and the call f(x::C()) is unqualified (not preceded by x:: or y::), this would normally not compile.
+
+However, due to [argument-dependent name lookup](https://en.wikipedia.org/wiki/Argument-dependent_name_lookup) a.k.a. "Koenig lookup", the behavior is well defined.
+
+With argument-dependent name lookup, the namespaces of the arguments to a function is added to the set of namespaces to be searched for that function. Since we're passing an x::C to f, the namespace x is also searched, and the function x::f is found.
+
+[basic.lookup.argdep](https://timsong-cpp.github.io/cppwp/n4659/basic.lookup.argdep#1)§6.4.2¶1 in the C++ standard:
+"When the postfix-expression in a function call (§8.2.2) is an unqualified-id, other namespaces not considered during the usual unqualified lookup (§6.4.1) may be searched(...). These modifications to the search depend on the types of the arguments (...)."
+
+f is an unqualified-id, so "other namespaces" may be searched.
+
+[basic.lookup.argdep](https://timsong-cpp.github.io/cppwp/n4659/basic.lookup.argdep#2)§6.4.2¶2 has more:
+"For each argument type T in the function call, there is a set of zero or more associated namespaces and a set of zero or more associated classes to be considered. The sets of namespaces and classes are determined entirely by the types of the function arguments (...). The sets of namespaces and classes are determined in the following way:
+(...)
+- If T is a class type (including unions), its associated classes are: the class itself; the class of which it is a member, if any; and its direct and indirect base classes. Its associated namespaces are the namespaces of which its associated classes are members."
+
+T in our case is C, so it's associated classes is just C. It's associated namespaces is then just x, which is searched to find a function f.
+</p>
+</details>
+
+#### 97. :skull::skull:
+```
+#include <iostream>
+
+namespace A {
+  extern "C" { int x; }
+};
+
+namespace B {
+  extern "C" { int x; }
+};
+
+int A::x = 0;
+
+int main() {
+  std::cout << B::x;
+  A::x=1;
+  std::cout << B::x;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program has a compilation error 
+A::x and B::x actually refer to the same variable, and int x; is a definition, not a declaration. Defining the same variable twice results in a compilation error.
+
+Why do A::x and B::x refer to the same variable?
+
+[dcl.link](https://timsong-cpp.github.io/cppwp/n4659/dcl.link#6)§10.5¶6 in the C++ standard:
+"Two declarations for a variable with C language linkage with the same name (ignoring the namespace names that qualify it) that appear in different namespace scopes refer to the same variable."
+
+Now, why is int x; a definition, and not an extern declaration? The standard declares that "a declaration directly contained in a linkage-specification is treated as if it contains the extern specifier". x is not directly contained in the linkage specification, and thus doesn't have the implicit extern. Therefore it's a definition and repeated definition of x causes a compilation error.
+
+[dcl.link](https://timsong-cpp.github.io/cppwp/n4659/dcl.link#7)§10.5¶7 in the standard has the explanation and a relevant example:
+"A declaration directly contained in a linkage-specification is treated as if it contains the extern specifier (10.1.1) for the purpose of determining the linkage of the declared name and whether it is a definition. (...) [ Example:
+
+(...)
+extern "C" int i;                   // declaration
+extern "C" {
+  int i;                            // definition
+}
+(...)
+
+Note: This question is identical to 92. except for the {} surrounding int x;.
+</p>
+</details>
+
+#### 98. :skull::skull:
+```
+#include <iostream>
+
+int main() {
+   constexpr unsigned int id = 100;
+   unsigned char array[] = { id % 3, id % 5 };
+   std::cout << static_cast<unsigned int>(array[0]) << static_cast<unsigned int>(array[1]) ;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 10
+array is an array of unsigned char, but is initialized with unsigned ints. The unsigned ints have to be converted to unsigned chars, so we might expect a narrowing diagnostic. [dcl.init.aggr](https://timsong-cpp.github.io/cppwp/n4659/dcl.init.aggr#3)§11.6.1¶3 in the standard says:
+
+    (...) If the initializer-clause is an expression and a narrowing conversion (§11.6.4) is required to convert the expression, the program is ill-formed. (...)
+
+[dcl.init.list](https://timsong-cpp.github.io/cppwp/n4659/dcl.init.list)§11.k.4¶7 tells us what a narrowing conversion is:
+
+    A narrowing conversion is an implicit conversion (...) from an integer type (...) to an integer type that cannot represent all the values of the original type
+
+An unsigned char cannot represent all the values of an unsigned int, so we would normally expect a diagnostic. However, the above clause continues with an exception for the case where the source is a constant expression whose value after promotion fits in the target type:
+
+    except where the source is a constant expression whose value after integral promotions will fit into the target type.
+
+So since id is constexpr, and both id % 3 and id % 5 fits in an unsigned char, the program is well-formed.
+</p>
+</details>
+
+#### 99. :skull::skull::skull:
+```
+#include <iostream>
+
+int main() {
+   int n = sizeof(0)["abcdefghij"]; 
+   std::cout << n;   
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 1
+We have several pieces of the puzzle, so let's peel away the layers.
+
+The grammar for sizeof is in [expr.unary](https://timsong-cpp.github.io/cppwp/n4659/expr.unary#1)§8.3¶1:
+
+    unary-expression:
+    ...
+    sizeof unary-expression
+    sizeof ( type-id )
+    sizeof ... ( identifier )
+    ...
+
+We have three cases and the one that applies here is sizeof unary-expression. The unary expression is (0)["abcdefghij"], which looks odd but is just array indexing of string literal which is a const char array.
+
+We can see that (0)["abcdefghij"] is identical to ("abcdefghij")[0] from [expr.sub](https://timsong-cpp.github.io/cppwp/n4659/expr.sub#1)§8.2.1¶1 which says:
+
+    ... The expression E1[E2] is identical (by definition) to *((E1)+(E2)) ...
+
+So we end up with 0th element of "abcdefghij", which is a, which is a char. And the result of sizeof('a') will be 1 since [expr.sizeof](https://timsong-cpp.github.io/cppwp/n4659/expr.sizeof#1)§8.3.3¶1 says:
+
+    ... sizeof(char), sizeof(signed char) and sizeof(unsigned char) are 1 ...
+</p>
+</details>
+
+#### 100. :skull:
+```
+#include <iostream>
+#include <map>
+using namespace std;
+
+bool default_constructed = false;
+bool constructed = false;
+bool assigned = false;
+
+class C {
+public:
+    C() { default_constructed = true; }
+    C(int) { constructed = true; }
+    C& operator=(const C&) { assigned = true; return *this;}
+};
+
+int main() {
+    map<int, C> m;
+    m[7] = C(1);
+
+    cout << default_constructed << constructed << assigned;
+}
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### The program is guaranteed to output: 111
+The [] operator inserts an element if the key is not present. In the case of a class, the element is default constructed. So doing m[7] calls the default constructor of C (no matter if we assign to it right after), setting default_constructed to true.
+
+The expression C(1) constructs an instance of C using the constructor taking an int, setting constructed to true.
+
+The = in m[7] = C(1) calls the copy assignment operator to copy assign the newly created C(1) to the previously default constructed C inside the map, setting assigned to true.
+
+The fact that an object is first default constructed is covered by [map.access](https://timsong-cpp.github.io/cppwp/n4659/map.access#2)§26.4.4.3¶2 in the standard:
+
+    T& operator[](key_type&& x);
+
+    Effects: Equivalent to: return try_emplace(move(x)).first->second;
+
+where try_emplace is defined by [map.modifiers](https://timsong-cpp.github.io/cppwp/n4659/map.modifiers#8)§26.4.4.4¶8:
+
+    template <class... Args> pair<iterator, bool> try_emplace(key_type&& k, Args&&... args);
+
+    Effects: If the map already contains an element whose key is equivalent to k, there is no effect. Otherwise inserts an object of type value_type constructed with piecewise_construct, forward_as_tuple(std::move(k)), forward_as_tuple(std::forward<Args>(args)...).
+
+value_type is just a typedef for pair<const Key, T>, which in our case is pair<const int, C>. So it inserts a pair(7, C()), which calls the default constructor for C.
+
+To avoid the default construction followed by a copy assignment, you can use one of the following:
+
+m.insert(pair<int, C>(7, C(1)));
+m.emplace(7, C(1));
+</p>
+</details>
+
+#### 101. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
