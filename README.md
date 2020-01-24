@@ -1,11 +1,11 @@
 # CPlusPlus
-Based on the site http://cppquiz.org/quiz, extraced questions for easier overview.
+Based on the site http://cppquiz.org/quiz, extracted questions for easier overview.
 
 The more :skull: you see, the higher the difficulty!
 
 According to the C++17 standard, what is the output of the following programs? 
  
-#### 1. :skull:   
+#### 1. :skull::skull:   
 ```
 #include <iostream>
 
@@ -207,6 +207,7 @@ Since a is neither explicitly nor implicitly captured, a in the lambda expressio
 </p>
 </details>
 
+6. 
 ```
 ```
 <details><summary><b>Answer</b></summary>
