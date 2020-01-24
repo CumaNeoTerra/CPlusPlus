@@ -2464,47 +2464,238 @@ Plain char, signed char, and unsigned char are three distinct types (...).
 </p>
 </details>
 
-#### 76. :skull:
-```
+#### 76. :skull::skull:
+```   
+#include <iostream>
+#include <typeinfo>
+
+struct A {};
+
+int main() 
+{
+    std::cout<< (&typeid(A) == &typeid(A));
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is unspecified / implementation defined 
+[expr.typeid](https://timsong-cpp.github.io/cppwp/n4659/expr.typeid#1)§8.2.8¶1: "The result of a typeid expression is an lvalue of static type const std::type_info",
+and
+[expr.unary.op](https://timsong-cpp.github.io/cppwp/n4659/expr.unary.op#3)§8.3.1¶3: "The result of the unary & operator is a pointer to its operand",
+so we're comparing two pointers to const std::type_info.
+
+There is no guarantee that the same std::type_info instance will be referred to by all evaluations of the typeid expression on the same type, although std::type_info::hash_code of those type_info objects would be identical, as would be their std::type_index.
+
+(For more info on hash_code(), see [type.info](https://timsong-cpp.github.io/cppwp/n4659/type.info#7)§21.7.2¶7 : "hash_code() (...)shall return the same value for any two type_info objects which compare equal")
+
+(For more info on type_index equality, see [type.index.members](https://timsong-cpp.github.io/cppwp/n4659/type.index.members)§23.18.3 and [type.info](https://timsong-cpp.github.io/cppwp/n4659/type.info)§21.7.2)
 </p>
 </details>
 
 #### 77. :skull:
 ```
+#include <iostream>
+#include <vector>
+
+struct Foo
+{
+    Foo() { std::cout<<"a"; }
+    Foo(const Foo&) { std::cout<<"b"; }
+};
+
+int main()
+{
+    std::vector<Foo> bar(5);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: aaaaa
+Since C++11, std::vector has a one parameter constructor ( + allocator). [vector.cons](https://timsong-cpp.github.io/cppwp/n4659/vector.cons#3)§26.3.11.2¶3 in the standard):
+
+explicit vector(size_type n, const Allocator& = Allocator())
+
+which constructs a vector with n value-initialized elements. Each value-initialization calls the default Foo constructor, resulting in the output aaaaa .
+
+The "trick" is, that before C++11, std::vector had a 2 parameter constructor ( + allocator ), which constructed the container with n copies of the second parameter, which is defaulted to T().
+
+So this code before C++11 would output abbbbb, because the call would be equivalent to std::vector<Foo> bar(5,T()).
 </p>
 </details>
 
-#### 78. :skull:
+#### 78. :skull::skull:
 ```
+#include <iostream>
+
+int i;
+
+void f(int x) {
+    std::cout << x << i;
+}
+
+int main() {
+    i = 3;
+    f(i++);
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 34
+According to [intro.execution](https://timsong-cpp.github.io/cppwp/n4659/intro.execution#18)§4.6¶18 in the standard, when calling a function, every value computation and side effect associated with any argument expression, is sequenced before the function is entered. Hence, in the expression f(i++), f is called with a parameter of the original value of i, but i is incremented before entering the body of f.
 </p>
 </details>
 
-#### 79. :skull:
+#### 79. :skull::skull:
 ```
+#include <iostream>
+
+struct A {
+    virtual void foo (int a = 1) {
+        std::cout << "A" << a;
+    }
+};
+
+struct B : A {
+    virtual void foo (int a = 2) {
+        std::cout << "B" << a;
+    }
+};
+
+int main () {
+    A *b = new B;
+    b->foo();
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: B1
+n the first line of main, we create a new B object, with an A pointer a pointing to it.
+
+On the next line, we call b->foo(), where b has the static type A, and the dynamic type B. Since foo() is virtual, the dynamic type of b is used to ensure B::foo() gets called rather than A::foo().
+
+However, which default argument is used for the int a parameter to foo()? [dcl.fct.default](https://timsong-cpp.github.io/cppwp/n4659/dcl.fct.default#10)§11.3.6¶10 in the standard:
+
+    A virtual function call (§13.3) uses the default arguments in the declaration of the virtual function determined by the static type of the pointer or reference denoting the object. An overriding function in a derived class does not acquire default arguments from the function it overrides.
+
+So B::foo() is called, but with the default argument from A::foo(), and the output is B1.
 </p>
 </details>
 
 #### 80. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 81. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 82. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 83. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 84. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 85. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 86. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 87. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 88. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 89. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 90. :skull:
+```
+```
+<details><summary><b>Answer</b></summary>
+<p>
+
+#### 
+</p>
+</details>
+
+#### 91. :skull:
 ```
 ```
 <details><summary><b>Answer</b></summary>
