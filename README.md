@@ -63,10 +63,10 @@ Let's have a look at the standard:
 Initialization order is defined in [class.base.init](https://timsong-cpp.github.io/cppwp/n4659/class.base.init#13)§15.6.2¶13:
 
 "In a non-delegating constructor, initialization proceeds in the following order:
-- (...)
-- Then direct base classes are initialized in declaration order as they appear in the base-specifier-list (regardless of the order of the mem-initializers)
-- (...)
-- Finally, the compound-statement of the constructor body is executed."
+- (...)  
+- Then direct base classes are initialized in declaration order as they appear in the base-specifier-list (regardless of the order of the mem-initializers)  
+- (...)  
+- Finally, the compound-statement of the constructor body is executed."  
 
 Destruction order is defined in [class.dtor](https://timsong-cpp.github.io/cppwp/n4659/class.dtor#9)§15.4¶9:
 
@@ -193,9 +193,9 @@ int main() {
 
 It is clear that a is not captured explicitly, so the question is whether a should be captured implicitly (and if yes, then a default capture has to be specified). [expr.prim.lambda.capture](https://timsong-cpp.github.io/cppwp/n4659/expr.prim.lambda.capture#7)§8.1.5.2¶7 says:
 
-    A lambda-expression with an associated capture-default that does not explicitly capture *this or a variable with automatic storage duration [...], is said to implicitly capture the entity (i.e., *this or a variable) if the compound-statement:
-    - odr-uses the entity (in the case of a variable),
-    - [...]
+    A lambda-expression with an associated capture-default that does not explicitly capture *this or a variable with automatic storage duration [...], is said to implicitly capture the entity (i.e., *this or a variable) if the compound-statement:  
+    - odr-uses the entity (in the case of a variable),  
+    - [...]  
 
 The use of a constitutes an odr-use. But since a has static storage duration rather than automatic storage duration, it is not implicitly captured.
 
@@ -323,11 +323,11 @@ int main() {
 
 According to [dcl.type.simple](https://timsong-cpp.github.io/cppwp/n4659/dcl.type.simple#4)§10.1.7.2¶4 in the C++ standard:
 "The type denoted by decltype(e) is deﬁned as follows:
-- if e is an unparenthesized id-expression naming a structured binding ([dcl.struct.bind](https://timsong-cpp.github.io/cppwp/n4659/dcl.struct.bind)§11.5), decltype(e) is the referenced type as given in the specification of the structured binding declaration;
-— if e is an unparenthesized id-expression or an unparenthesized class member access ([expr.ref](https://timsong-cpp.github.io/cppwp/n4659/expr.ref)§8.2.5), decltype(e) is the type of the entity named by e. If there is no such entity, or if e names a set of overloaded functions, the program is ill-formed;
-— otherwise, if e is an xvalue, decltype(e) is T&&, where T is the type of e;
-— otherwise, if e is an lvalue, decltype(e) is T&, where T is the type of e;
-— otherwise, decltype(e) is the type of e."
+- if e is an unparenthesized id-expression naming a structured binding ([dcl.struct.bind](https://timsong-cpp.github.io/cppwp/n4659/dcl.struct.bind)§11.5), decltype(e) is the referenced type as given in the specification of the structured binding declaration;  
+— if e is an unparenthesized id-expression or an unparenthesized class member access ([expr.ref](https://timsong-cpp.github.io/cppwp/n4659/expr.ref)§8.2.5), decltype(e) is the type of the entity named by e. If there is no such entity, or if e names a set of overloaded functions, the program is ill-formed;  
+— otherwise, if e is an xvalue, decltype(e) is T&&, where T is the type of e;  
+— otherwise, if e is an lvalue, decltype(e) is T&, where T is the type of e;  
+— otherwise, decltype(e) is the type of e."  
 
 Because a is encapsulated in parentheses, it doesn't qualify for the first case, it is treated as an lvalue, therefore b's type is int&, not int.
 
@@ -427,9 +427,9 @@ Scott Meyers has written a very good article about this, where he introduces the
 
 In this example, all three functions are called once with an lvalue and once with an rvalue. In all cases, calling with an lvalue (i) collapses T&& x to T& x (an lvalue reference), and calling with an rvalue (20) collapses T&& x to T&& x (an rvalue reference). Inside the functions, x itself is always an lvalue, no matter if its type is an rvalue reference or an lvalue reference.
 
--For the first example, y(int&) is called for both cases. Output: 11.
--For the second example, move(x) obtains an rvalue reference, and y(int&&)is called for both cases. Output: 22.
--For the third example, forward<T>(x) obtains an lvalue reference when x is an lvalue reference, and an rvalue reference when x is an rvalue reference, resulting in first a call to y(int&)and then a call to y(int&&). Output: 12.
+-For the first example, y(int&) is called for both cases. Output: 11.  
+-For the second example, move(x) obtains an rvalue reference, and y(int&&)is called for both cases. Output: 22.  
+-For the third example, forward<T>(x) obtains an lvalue reference when x is an lvalue reference, and an rvalue reference when x is an rvalue reference, resulting in first a call to y(int&)and then a call to y(int&&). Output: 12.  
 
 Note [1]: [dcl.ref](https://timsong-cpp.github.io/cppwp/n4659/dcl.ref#6)§11.3.2¶6 in the standard: "If a typedef-name (§10.1.3, §17.1) or a decltype-specifier (§10.1.7.2) denotes a type TR that is a reference to a type T, an attempt to create the type “lvalue reference to cv TR” creates the type “lvalue reference to T”, while an attempt to create the type “rvalue reference to cv TR” creates the type TR." The example at the end of that paragraph is worth a look.
 
@@ -517,8 +517,8 @@ What are "the usual arithmetic conversions"?
 [expr](https://timsong-cpp.github.io/cppwp/n4659/expr#11)§8¶11:
 
     Many binary operators that expect operands of arithmetic or enumeration type cause conversions and yield result types in a similar way. The purpose is to yield a common type, which is also the type of the result. This pattern is called the usual arithmetic conversions, which are defined as follows:
-    - [a bunch of rules for floats, enums etc]
-    - Otherwise, the integral promotions (7.6) shall be performed on both operands
+    - [a bunch of rules for floats, enums etc]  
+    - Otherwise, the integral promotions (7.6) shall be performed on both operands  
 
 So both chars go through integral promotions. Those are defined in [conv.prom](https://timsong-cpp.github.io/cppwp/n4659/conv.prom#1)§7.6¶1:
 
@@ -623,9 +623,9 @@ int main() {
 These are two examples of initialization. The first form, C c1(7), is called direct-initialization, the second, C c2 = 7, is called copy-initialization. In most cases they are equivalent, but in this example they are not, since the int constructor is explicit.
 
 The key is in [over.match.copy](https://timsong-cpp.github.io/cppwp/n4659/over.match.copy#1)§16.3.1.4¶1 :
-"[...] as part of a copy-initialization of an object of class type, a user-defined conversion can be invoked to convert an initializer expression to the type of the object being initialized. [...] the candidate functions are selected as follows:
-- [...]
-- When the type of the initializer expression is a class type "cv S", the non-explicit conversion functions of S and its base classes are considered. [...]
+"[...] as part of a copy-initialization of an object of class type, a user-defined conversion can be invoked to convert an initializer expression to the type of the object being initialized. [...] the candidate functions are selected as follows:  
+- [...]  
+- When the type of the initializer expression is a class type "cv S", the non-explicit conversion functions of S and its base classes are considered. [...]  
 (emphasis added)
 
 And how is direct-initialization defined?
@@ -1058,8 +1058,8 @@ int main() {
 "It is implementation-defined whether the dynamic initialization of a non-local inline variable with static storage duration is sequenced before the first statement of main or is deferred. If it is deferred, it strongly happens before any non-initialization odr-use of that variable."
 
 Since A() is not constexpr, the initialization of a is dynamic. There are two possibilities:
-- a is initialized before main() is called, i.e. before b or c are initialized.
-- a is not initialized before main(). It is however guaranteed to be initialized before the the use of any function defined in the same translation unit, i.e. before the constructors of b and c are called.
+- a is initialized before main() is called, i.e. before b or c are initialized.  
+- a is not initialized before main(). It is however guaranteed to be initialized before the the use of any function defined in the same translation unit, i.e. before the constructors of b and c are called.  
 
 Then, b and c are initialized in order.
 
@@ -1106,8 +1106,8 @@ int main() {
 "It is implementation-defined whether the dynamic initialization of a non-local non-inline variable with static storage duration is sequenced before the first statement of main or is deferred. If it is deferred, it strongly happens before any non-initialization odr-use of any non-inline function or non-inline variable defined in the same translation unit as the variable to be initialized."
 
 Since A() is not constexpr, the initialization of a is dynamic. There are two possibilities:
-- a is initialized before main() is called, i.e. before b is initialized.
-- a is not initialized before main(). It is however guaranteed to be initialized before the the use of any function defined in the same translation unit, i.e. before the constructor of b is called.
+- a is initialized before main() is called, i.e. before b is initialized.  
+- a is not initialized before main(). It is however guaranteed to be initialized before the the use of any function defined in the same translation unit, i.e. before the constructor of b is called.  
 
 When execution reaches B b, it is initialized as normal. Static local variables are initialized the first time control passes through their declaration, so c is initialized next. As main() is exited, its local variable b goes out of scope, and is destroyed. Finally, all static variables are destroyed in reverse order of their initialization, first c, then a.
 </p>
@@ -1463,10 +1463,10 @@ a1 is default initialized, as described in [dcl.init](https://timsong-cpp.github
 
 a2 doesn't actually use the initializer_list constructor with a list of zero elements, but the default constructor:
 [dcl.init.list](https://timsong-cpp.github.io/cppwp/n4659/dcl.init.list#3)§11.6¶3:
-List-initialization of an object or reference of type T is defined as follows:
-- (...)
-- Otherwise, if the initializer list has no elements and T is a class type with a default constructor, the object is value-initialized.
-- Otherwise, if T is a specialization of std::initializer_list, the object is constructed as described below.
+List-initialization of an object or reference of type T is defined as follows:  
+- (...)  
+- Otherwise, if the initializer list has no elements and T is a class type with a default constructor, the object is value-initialized.  
+- Otherwise, if T is a specialization of std::initializer_list, the object is constructed as described below.  
 
 a3's and a4's constructor is chosen in overload resolution, as described in [over.match.list](https://timsong-cpp.github.io/cppwp/n4659/over.match.list)§16.3.1.7:
 
@@ -2143,8 +2143,8 @@ The type of a string literal is "array of n const char" ([lex.string](https://ti
 This problem does however not result in a compiler error, since the compiler is able to find another constructor that matches!
 
 [over.match.list](https://timsong-cpp.github.io/cppwp/n4659/over.match.list#1)§16.3.1.7¶1 explains the rules very clearly:
-"When objects of non-aggregate class type T are list-initialized (...), overload resolution selects the constructor in two phases:
-— Initially, the candidate functions are the initializer-list constructors of the class T and the argument list consists of the initializer list as a single argument [which we have seen didn't match].
+"When objects of non-aggregate class type T are list-initialized (...), overload resolution selects the constructor in two phases:  
+— Initially, the candidate functions are the initializer-list constructors of the class T and the argument list consists of the initializer list as a single argument [which we have seen didn't match].  
 — If no viable initializer-list constructor is found, overload resolution is performed again, where the candidate functions are all the constructors of the class T and the argument list consists of the elements of the initializer list [in our case, the two string literals "," and ";" ]".
 
 Going back to [vector.overview](https://timsong-cpp.github.io/cppwp/n4659/vector.overview)§26.3.11.1, we find this candidate:
@@ -2254,10 +2254,10 @@ int main()
 #### The program is guaranteed to output: ABCDABCd
 On the first line of main(), d1 is initialized, in the order A, B, C, D. That order is defined by [class.base.init](https://timsong-cpp.github.io/cppwp/n4659/class.base.init#13)§15.6.2¶13:
 "
-— First, and only for the constructor of the most derived class (§4.5), virtual base classes are initialized in the order they appear on a depth-first left-to-right traversal of the directed acyclic graph of base classes, where “left-to-right” is the order of appearance of the base classes in the derived class base-specifier-list.
+— First, and only for the constructor of the most derived class (§4.5), virtual base classes are initialized in the order they appear on a depth-first left-to-right traversal of the directed acyclic graph of base classes, where “left-to-right” is the order of appearance of the base classes in the derived class base-specifier-list.  
 — Then, direct base classes are initialized in declaration order as they appear in the base-specifier-list
-(...)
-— Finally, the compound-statement of the constructor body is executed.
+(...)  
+— Finally, the compound-statement of the constructor body is executed.  
 "
 So the output is ABCD.
 
@@ -4185,28 +4185,51 @@ Is C const-default-constructible?
 
 [dcl.init](https://timsong-cpp.github.io/cppwp/n4659/dcl.init#7)§11.6¶7 again:
 
-    A class type T is const-default-constructible if default-initialization of T would invoke a user-provided constructor of T (not inherited from a base class) or if
-    - each direct non-variant non-static data member M of T has a default member initializer or, if M is of class type X (or array thereof), X is const-default-constructible,
-    - if T is a union with at least one non-static data member, exactly one variant member has a default member initializer,
-    - if T is not a union, for each anonymous union member with at least one non-static data member (if any), exactly one non-static data member has a default member initializer, and
-    - each potentially constructed base class of T is const-default-constructible.
+    A class type T is const-default-constructible if default-initialization of T would invoke a user-provided constructor of T (not inherited from a base class) or if  
+    - each direct non-variant non-static data member M of T has a default member initializer or, if M is of class type X (or array thereof), X is const-default-constructible,  
+    - if T is a union with at least one non-static data member, exactly one variant member has a default member initializer,  
+    - if T is not a union, for each anonymous union member with at least one non-static data member (if any), exactly one non-static data member has a default member initializer, and  
+    - each potentially constructed base class of T is const-default-constructible.  
 
 C does not have a user-provided constructor, and the points below don't apply either.
 
-There are several ways we could make C const-default-constructible:
-- Give int i a default member initializer: int i{0}.
-- Remove = default from the constructor, and instead do C::C() = default; separately outside the class definition. This constructor now counts as user-provided.
-- Manually provide a constructor: C() {}
+There are several ways we could make C const-default-constructible:  
+- Give int i a default member initializer: int i{0}.    
+- Remove = default from the constructor, and instead do C::C() = default; separately outside the class definition. This constructor now counts as user-provided.   
+- Manually provide a constructor: C() {}  
 </p>
 </details>
 
-#### 120. :skull:
+#### 120. :skull::skull:
 ```
+#include <iostream>
+#include <string>
+
+auto main() -> int {
+  std::string out{"Hello world"};
+  std::cout << (out[out.size()] == '\0');
+}
 ```
 <details><summary><b>Answer</b></summary>
 <p>
 
-#### 
+#### The program is guaranteed to output: 1
+Perhaps surprisingly, this program has no undefined behaviour. std::string's operator[](size_type pos) must return a reference to the null character when pos equals the length of the string:
+
+[string.access](https://timsong-cpp.github.io/cppwp/n4659/string.access#1)§24.3.2.5¶1:
+
+    operator[](size_type pos)
+    Returns: *(begin() + pos) if pos < size(). Otherwise, returns a reference to an object of type charT with value charT(), where modifying the object to any value other than charT() leads to undefined behavior.
+
+charT() is char() in this case. The char() expression value-initializes a char, which initializes it to 0.
+
+So out[out.size()] == '\0' compares 0 to \0. Are they the same? Yes:
+
+[lex.charset](https://timsong-cpp.github.io/cppwp/n4659/lex.charset#3)§5.3¶3:
+
+    The basic execution character set and the basic execution wide-character set shall each contain all the members of the basic source character set, plus control characters representing alert, backspace, and carriage return, plus a null character (respectively, null wide character), whose value is 0
+
+So the value of \0 is indeed 0. The comparison is true, and 1 is printed.
 </p>
 </details>
 
@@ -4299,39 +4322,6 @@ The core of the question is "in what order are the objects destroyed?". In C++, 
     In the case of an array, the elements will be destroyed in order of decreasing address (that is, in reverse order of the completion of their constructor (...).
 
 So the objects are destroyed in the order 2, 1, 0, and 210 is printed.
-</p>
-</details>
-
-#### 124. :skull::skull:
-```
-#include <iostream>
-#include <string>
-
-auto main() -> int {
-  std::string out{"Hello world"};
-  std::cout << (out[out.size()] == '\0');
-}
-```
-<details><summary><b>Answer</b></summary>
-<p>
-
-#### The program is guaranteed to output: 1
-Perhaps surprisingly, this program has no undefined behaviour. std::string's operator[](size_type pos) must return a reference to the null character when pos equals the length of the string:
-
-[string.access](https://timsong-cpp.github.io/cppwp/n4659/string.access#1)§24.3.2.5¶1:
-
-    operator[](size_type pos)
-    Returns: *(begin() + pos) if pos < size(). Otherwise, returns a reference to an object of type charT with value charT(), where modifying the object to any value other than charT() leads to undefined behavior.
-
-charT() is char() in this case. The char() expression value-initializes a char, which initializes it to 0.
-
-So out[out.size()] == '\0' compares 0 to \0. Are they the same? Yes:
-
-[lex.charset](https://timsong-cpp.github.io/cppwp/n4659/lex.charset#3)§5.3¶3:
-
-    The basic execution character set and the basic execution wide-character set shall each contain all the members of the basic source character set, plus control characters representing alert, backspace, and carriage return, plus a null character (respectively, null wide character), whose value is 0
-
-So the value of \0 is indeed 0. The comparison is true, and 1 is printed.
 </p>
 </details>
 
