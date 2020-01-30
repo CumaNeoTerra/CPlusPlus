@@ -1,4 +1,4 @@
-# CPlusPlus
+# CPlusPlus-Quiz
 Based on the site http://cppquiz.org/, extracted questions for easier overview.
 
 The more :skull: you see, the higher the difficulty!
